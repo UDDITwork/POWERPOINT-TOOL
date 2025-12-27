@@ -15,6 +15,7 @@ License: MIT
 """
 
 import anthropic
+from anthropic import transform_schema
 import json
 import logging
 from typing import Dict, List, Any, Optional
@@ -346,16 +347,12 @@ CRITICAL JSON REQUIREMENTS:
         logger.info(f"Generating diagram from prompt: {prompt[:100]}...")
 
         try:
-            # Use Anthropic's transform_schema helper to prepare schema
-            from anthropic import transform_schema
-
-            # Get Pydantic schema
+            # Get Pydantic schema and transform it using official SDK helper
+            # transform_schema automatically adds additionalProperties: false to all objects
             schema = DiagramSpec.model_json_schema()
-
-            # Transform schema for structured outputs (adds additionalProperties: false recursively)
             transformed_schema = transform_schema(schema)
 
-            # Use beta.messages.create with betas parameter (per official docs)
+            # Use beta.messages.create with betas parameter
             response = self.client.beta.messages.create(
                 model=self.model,
                 max_tokens=self.max_tokens,
@@ -370,7 +367,7 @@ CRITICAL JSON REQUIREMENTS:
                 ],
                 output_format={
                     "type": "json_schema",
-                    "schema": transformed_schema  # SDK-transformed schema
+                    "schema": transformed_schema  # Schema with additionalProperties: false
                 }
             )
 
@@ -424,10 +421,8 @@ CRITICAL JSON REQUIREMENTS:
         )
 
         try:
-            # Use Anthropic's transform_schema helper
-            from anthropic import transform_schema
-
-            # Get Pydantic schema and transform it
+            # Get Pydantic schema and transform it using official SDK helper
+            # transform_schema automatically adds additionalProperties: false to all objects
             schema = DiagramSpec.model_json_schema()
             transformed_schema = transform_schema(schema)
 
