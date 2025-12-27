@@ -4,22 +4,37 @@ __pycache__/
 *$py.class
 *.so
 .Python
-env/
-venv/
-ENV/
-*.egg-info/
-dist/
 build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
 
-# Environment
-.env
-*.env
+# Virtual Environment
+venv/
+env/
+ENV/
 
-# Generated files
-*.pptx
-*.png
-generated_diagrams/
-backend/generated_diagrams/
+# Backend Environment (DO NOT COMMIT API KEYS)
+backend/.env
+
+# Frontend build
+frontend/dist/
+frontend/build/
+frontend/node_modules/
+
+# Frontend local development env
+frontend/.env.local
 
 # IDE
 .vscode/
@@ -31,14 +46,14 @@ backend/generated_diagrams/
 .DS_Store
 Thumbs.db
 
-# Logs
+# Generated files
+*.pptx
 *.log
 
-# Node
-node_modules/
-npm-debug.log*
+# Test files
+backend/test_*.py
+backend/verification_test.*
+backend/generated_diagrams/
 
-# Testing
-.pytest_cache/
-.coverage
-htmlcov/
+# Git
+.git/

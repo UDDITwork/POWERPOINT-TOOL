@@ -1,0 +1,28 @@
+# Ignore local development files
+.env
+*.env
+venv/
+env/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Ignore generated files
+*.pptx
+*.png
+generated_diagrams/
+
+# Ignore test files (optional - comment out if you want to run tests on Cloud Run)
+test_*.py
+verification_test.pptx
+
+# Ignore IDE files
+.vscode/
+.idea/
+*.swp
+
+# Ignore git
+.git/
+.gitignore
