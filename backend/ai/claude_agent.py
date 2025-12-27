@@ -346,10 +346,28 @@ CRITICAL JSON REQUIREMENTS:
         logger.info(f"Generating diagram from prompt: {prompt[:100]}...")
 
         try:
-            response = self.client.messages.create(
+            # Get schema and add additionalProperties: false
+            schema = DiagramSpec.model_json_schema()
+
+            # Ensure additionalProperties: false for all objects (required by Anthropic)
+            def add_no_additional_properties(obj):
+                if isinstance(obj, dict):
+                    if obj.get("type") == "object":
+                        obj["additionalProperties"] = False
+                    for value in obj.values():
+                        add_no_additional_properties(value)
+                elif isinstance(obj, list):
+                    for item in obj:
+                        add_no_additional_properties(item)
+
+            add_no_additional_properties(schema)
+
+            # Use beta.messages.create with betas parameter (NOT extra_headers)
+            response = self.client.beta.messages.create(
                 model=self.model,
                 max_tokens=self.max_tokens,
                 temperature=0.0,  # Deterministic for JSON generation
+                betas=["structured-outputs-2025-11-13"],  # Beta feature activation
                 system=self.SYSTEM_PROMPT,
                 messages=[
                     {
@@ -357,14 +375,9 @@ CRITICAL JSON REQUIREMENTS:
                         "content": prompt
                     }
                 ],
-                extra_headers={
-                    "anthropic-beta": "structured-outputs-2025-11-13"
-                },
-                extra_body={
-                    "output_format": {
-                        "type": "json_schema",  # CORRECTED from "json"
-                        "schema": DiagramSpec.model_json_schema()  # Enforce Pydantic schema
-                    }
+                output_format={
+                    "type": "json_schema",
+                    "schema": schema  # Schema with additionalProperties: false
                 }
             )
 
@@ -418,10 +431,28 @@ CRITICAL JSON REQUIREMENTS:
         )
 
         try:
-            response = self.client.messages.create(
+            # Get schema and add additionalProperties: false
+            schema = DiagramSpec.model_json_schema()
+
+            # Ensure additionalProperties: false for all objects
+            def add_no_additional_properties(obj):
+                if isinstance(obj, dict):
+                    if obj.get("type") == "object":
+                        obj["additionalProperties"] = False
+                    for value in obj.values():
+                        add_no_additional_properties(value)
+                elif isinstance(obj, list):
+                    for item in obj:
+                        add_no_additional_properties(item)
+
+            add_no_additional_properties(schema)
+
+            # Use beta.messages.create with betas parameter
+            response = self.client.beta.messages.create(
                 model=self.model,
                 max_tokens=self.max_tokens,
                 temperature=0.0,  # Deterministic for JSON generation
+                betas=["structured-outputs-2025-11-13"],
                 system=system_prompt,
                 messages=[
                     {
@@ -429,14 +460,9 @@ CRITICAL JSON REQUIREMENTS:
                         "content": f"Apply this refinement: {refinement_prompt}"
                     }
                 ],
-                extra_headers={
-                    "anthropic-beta": "structured-outputs-2025-11-13"
-                },
-                extra_body={
-                    "output_format": {
-                        "type": "json_schema",  # CORRECTED from "json"
-                        "schema": DiagramSpec.model_json_schema()  # Enforce Pydantic schema
-                    }
+                output_format={
+                    "type": "json_schema",
+                    "schema": schema  # Schema with additionalProperties: false
                 }
             )
 
