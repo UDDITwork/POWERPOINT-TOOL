@@ -322,17 +322,12 @@ CRITICAL JSON REQUIREMENTS:
             max_tokens: Maximum tokens in response
             temperature: Creativity level (0.0 for JSON generation)
         """
-        self.client = anthropic.Anthropic(
-            api_key=api_key,
-            default_headers={
-                "anthropic-beta": "structured-outputs-2025-11-13"  # Enable Structured Outputs
-            }
-        )
+        self.client = anthropic.Anthropic(api_key=api_key)
         self.model = model
         self.max_tokens = max_tokens
         self.temperature = temperature
 
-        logger.info(f"Initialized Claude agent with model: {model} (Structured Outputs enabled)")
+        logger.info(f"Initialized Claude agent with model: {model}")
 
     def generate_diagram_spec(self, prompt: str) -> Dict[str, Any]:
         """
@@ -362,9 +357,14 @@ CRITICAL JSON REQUIREMENTS:
                         "content": prompt
                     }
                 ],
-                output_format={
-                    "type": "json",
-                    "schema": DiagramSpec.model_json_schema()  # Enforce Pydantic schema
+                extra_headers={
+                    "anthropic-beta": "structured-outputs-2025-11-13"
+                },
+                extra_body={
+                    "output_format": {
+                        "type": "json",
+                        "schema": DiagramSpec.model_json_schema()  # Enforce Pydantic schema
+                    }
                 }
             )
 
@@ -429,9 +429,14 @@ CRITICAL JSON REQUIREMENTS:
                         "content": f"Apply this refinement: {refinement_prompt}"
                     }
                 ],
-                output_format={
-                    "type": "json",
-                    "schema": DiagramSpec.model_json_schema()  # Enforce Pydantic schema
+                extra_headers={
+                    "anthropic-beta": "structured-outputs-2025-11-13"
+                },
+                extra_body={
+                    "output_format": {
+                        "type": "json",
+                        "schema": DiagramSpec.model_json_schema()  # Enforce Pydantic schema
+                    }
                 }
             )
 
