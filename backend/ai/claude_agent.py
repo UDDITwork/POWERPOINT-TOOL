@@ -439,17 +439,34 @@ OUTPUT: Complete updated JSON specification
             text = text[start:end].strip()
 
         # Clean up common JSON issues
-        # Remove trailing commas before closing braces/brackets
         import re
+
+        # Remove trailing commas before closing braces/brackets
         text = re.sub(r',(\s*[}\]])', r'\1', text)
+
+        # Remove comments (sometimes Claude adds them)
+        text = re.sub(r'//.*?\n', '\n', text)
+        text = re.sub(r'/\*.*?\*/', '', text, flags=re.DOTALL)
+
+        # Fix common Unicode issues
+        text = text.replace('\u2019', "'")  # Right single quote
+        text = text.replace('\u201c', '"')  # Left double quote
+        text = text.replace('\u201d', '"')  # Right double quote
 
         # Try to parse
         try:
             return json.loads(text)
         except json.JSONDecodeError as e:
-            # Log the problematic JSON for debugging
+            # Log detailed error info
             logger.error(f"JSON parse error at line {e.lineno} column {e.colno}: {e.msg}")
-            logger.error(f"Problematic JSON:\n{text}")
+            logger.error(f"Character at error: {repr(text[e.pos:e.pos+10]) if e.pos < len(text) else 'EOF'}")
+
+            # Show error line
+            lines = text.split('\n')
+            if e.lineno <= len(lines):
+                logger.error(f"Line {e.lineno}: {lines[e.lineno - 1]}")
+                logger.error(f"{' ' * (e.colno - 1)}^")
+
             raise ValueError(f"Invalid JSON from Claude: {e.msg} at line {e.lineno} column {e.colno}")
 
     def analyze_prompt_complexity(self, prompt: str) -> Dict[str, Any]:
