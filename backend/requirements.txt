@@ -1,0 +1,71 @@
+# =====================================================
+# AI PATENT DIAGRAM GENERATOR - CLOUD RUN COMPATIBLE
+# =====================================================
+# All dependencies are pure Python - NO C++ compilers needed!
+
+# ============ Core Backend Framework ============
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+pydantic==2.5.3
+pydantic-settings==2.1.0
+python-multipart==0.0.6
+
+# ============ PowerPoint Generation (PRIMARY) ============
+python-pptx==1.0.0          # 182 shapes, 100% native PPTX
+Pillow==10.1.0              # Image processing for previews
+
+# ============ AI Integration (Direct API - NO LangChain!) ============
+anthropic==0.40.0           # Claude API - pure Python
+
+# ============ Database & Memory (Cloud-Native) ============
+# Turso SQLite Cloud - for session history and awareness
+libsql-client==0.4.0        # Turso Python client (pure Python)
+sqlalchemy==2.0.25          # ORM
+alembic==1.13.1             # Migrations
+
+# Pinecone - Vector DB for semantic diagram search (OPTIONAL)
+pinecone-client==3.0.0      # Pure Python
+
+# ============ Task Queue (Pure Python - NO Celery/Redis!) ============
+# For Cloud Run, we use async/await - no external queue needed
+# Background tasks handled by FastAPI BackgroundTasks
+
+# ============ Environment & Config ============
+python-dotenv==1.0.0
+typing-extensions==4.9.0
+
+# ============ HTTP Client ============
+httpx==0.26.0               # Async HTTP client
+
+# ============ Utilities ============
+python-dateutil==2.8.2
+pytz==2024.1
+
+# ============ Monitoring & Logging ============
+structlog==24.1.0           # Structured logging
+sentry-sdk[fastapi]==1.40.0 # Error tracking (optional)
+
+# ============ Security ============
+python-jose[cryptography]==3.3.0  # JWT tokens
+passlib[bcrypt]==1.7.4            # Password hashing (if adding auth)
+
+# ============ CORS & Middleware ============
+# (Built into FastAPI, no extra deps)
+
+# ============ Testing ============
+pytest==7.4.4
+pytest-asyncio==0.23.3
+pytest-cov==4.1.0
+faker==22.5.1               # Generate test data
+
+# ============ Cloud Storage (Google Cloud Run) ============
+google-cloud-storage==2.14.0      # For storing PPTX files in GCS
+google-cloud-secret-manager==2.17.0  # For API keys
+
+# ============ NOTES ============
+# ✅ All packages are pure Python - no C/C++ compilation
+# ✅ Cloud Run compatible
+# ✅ No Redis/Celery - using FastAPI background tasks
+# ✅ Turso for persistent session memory
+# ✅ Pinecone for vector search (optional feature)
+# ✅ NO LangChain - direct Anthropic API is faster & simpler

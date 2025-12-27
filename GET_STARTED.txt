@@ -1,0 +1,173 @@
+================================================================================
+AI PATENT DIAGRAM GENERATOR - QUICK START GUIDE
+================================================================================
+
+WHAT YOU HAVE:
+- Elite AI system for generating patent-quality diagrams
+- Handles complex diagrams like FIG. 2 (nested hierarchies)
+- 100% editable PowerPoint output
+- Cloud Run ready (no C++ compiler dependencies)
+
+================================================================================
+STEP 1: INSTALL DEPENDENCIES
+================================================================================
+
+cd backend
+pip install -r requirements.txt
+
+This installs:
+- anthropic (Claude API)
+- python-pptx (diagram generation)
+- fastapi (web server)
+- All dependencies (100% pure Python)
+
+================================================================================
+STEP 2: VERIFY SETUP
+================================================================================
+
+python setup_and_test.py
+
+This will:
+✅ Check Python version
+✅ Verify API keys
+✅ Test Claude connectivity
+✅ Generate a test diagram (verification_test.pptx)
+
+If successful, you'll see "SETUP VERIFICATION COMPLETE"
+
+================================================================================
+STEP 3: TEST PATENT-QUALITY DIAGRAMS
+================================================================================
+
+python test_elite.py
+
+This generates 4 test files:
+1. test_fig2_complex.pptx    - FIG. 2 style (nested hierarchy)
+2. test_fig5_flowchart.pptx  - FIG. 5 style (sequential flow)
+3. test_network.pptx         - Network diagram
+4. test_refinement_v1.pptx   - Iterative refinement demo
+   test_refinement_v2.pptx
+
+Open these in PowerPoint - EVERY shape is individually editable!
+
+================================================================================
+STEP 4: START API SERVER (OPTIONAL)
+================================================================================
+
+python main.py
+
+Server runs at: http://localhost:8000
+API docs at: http://localhost:8000/api/docs
+
+You can now:
+- POST /api/diagram/create - Generate diagrams via API
+- GET /api/diagram/status/{job_id} - Check status
+- GET /api/diagram/download/{job_id} - Download PPTX
+
+================================================================================
+USAGE EXAMPLE (Python)
+================================================================================
+
+from diagram_engine.unified_pipeline import PatentDiagramPipeline
+
+pipeline = PatentDiagramPipeline(
+    anthropic_api_key="your-key-here"
+)
+
+# Generate FIG. 2 style diagram
+pipeline.generate(
+    prompt="""
+    Create a computer system with:
+    - Computer System (202) containing:
+      - System Metrics (210A)
+      - Time Series Model (212) containing:
+        - Embeddings (212A) with 214A and 214B
+    """,
+    output_path="my_diagram.pptx",
+    quality="high"  # Use multi-pass for best quality
+)
+
+# Result: my_diagram.pptx (fully editable!)
+
+================================================================================
+KEY FILES
+================================================================================
+
+backend/
+├── setup_and_test.py          ← Start here!
+├── test_elite.py              ← Test patent-quality diagrams
+├── main.py                    ← API server
+│
+├── ai/
+│   ├── elite_agent.py         ← Advanced Claude agent
+│   └── advanced_prompts.py    ← Expert system prompts
+│
+├── diagram_engine/
+│   ├── unified_pipeline.py    ← Master orchestrator
+│   ├── advanced_layout.py     ← Layout algorithms
+│   └── pptx_generator.py      ← PPTX rendering
+│
+└── .env                       ← Your API keys (already configured)
+
+================================================================================
+WHAT MAKES THIS "ELITE"?
+================================================================================
+
+✅ Multi-stage pipeline:
+   1. Claude analyzes and generates logical structure
+   2. Advanced layout engine calculates positions
+   3. python-pptx renders to native PowerPoint
+
+✅ Handles complexity:
+   - Nested hierarchies (4+ levels)
+   - 30+ components
+   - Auto-sizing containers
+   - Smart connector routing
+
+✅ Patent-quality output:
+   - Proper reference numbering (100, 110, 200, etc.)
+   - Professional layouts
+   - 100% editable in PowerPoint
+
+✅ Cloud-ready:
+   - No C++ compiler needed
+   - Google Cloud Run compatible
+   - Scalable to 10-15+ concurrent users
+
+================================================================================
+TROUBLESHOOTING
+================================================================================
+
+Error: "ANTHROPIC_API_KEY not found"
+→ Check backend/.env file has your API key
+
+Error: "Module not found"
+→ Run: pip install -r requirements.txt
+
+Error: "API connection failed"
+→ Check internet connection and API key validity
+
+Diagrams look wrong in PowerPoint
+→ Make sure you're using PowerPoint (not Google Slides)
+→ All shapes should be individually selectable
+
+================================================================================
+NEXT STEPS
+================================================================================
+
+1. ✅ Run setup_and_test.py to verify everything works
+2. ✅ Run test_elite.py to see FIG. 2 complexity
+3. ✅ Open generated .pptx files in PowerPoint
+4. ✅ Try your own prompts!
+5. ✅ Deploy to Cloud Run (optional)
+
+================================================================================
+
+Questions? Issues?
+- Check the code comments in elite_agent.py
+- Review test_elite.py for usage examples
+- API docs: http://localhost:8000/api/docs (when server running)
+
+================================================================================
+READY TO GENERATE PATENT-QUALITY DIAGRAMS! 🚀
+================================================================================

@@ -1,0 +1,195 @@
+# Sample Prompts for AI Patent Diagram Generator
+
+## Simple Flowcharts
+
+### Basic 3-Step Process
+Create a flowchart with 3 steps: Input (100), Processing (200), Output (300). Connect them vertically with arrows.
+
+### Data Processing Method
+Generate a patent method flowchart showing:
+- Start: Receive sensor data (100)
+- Process: Validate data (200)
+- Decision: Is data valid? (210)
+- If yes: Store in database (300)
+- If no: Request new data (220)
+- End: Complete (400)
+
+### Machine Learning Pipeline
+Create a flowchart for an ML system:
+- Step 100: Collect training data
+- Step 200: Preprocess and clean data
+- Step 300: Train neural network model
+- Step 400: Validate model accuracy
+- Step 500: Deploy model to production
+Add decision point after validation: if accuracy > 95%, deploy; else, retrain
+
+---
+
+## Block Diagrams
+
+### Client-Server Architecture
+Draw a system architecture diagram with:
+- Server (100) in the center
+- Database (110) on the right side connected to server
+- API Gateway (120) on the left side connected to server
+- Three client devices (200, 210, 220) at the bottom connected to API Gateway
+Use bidirectional arrows for all connections
+
+### IoT System
+Create a block diagram showing:
+- Cloud Server (100) at the top
+- Edge Gateway (110) in the middle
+- Five IoT sensors (200-240) at the bottom connected to gateway
+- Storage module (150) connected to cloud server
+Label all connections with "WiFi" or "BLE"
+
+### Microservices Architecture
+Draw microservices system:
+- Load Balancer (100) at top
+- Three service nodes below: Auth Service (200), API Service (210), Data Service (220)
+- Message Queue (300) at bottom connected to all services
+- Two databases: User DB (150), Main DB (160)
+Show data flow with arrows
+
+---
+
+## Network Diagrams
+
+### Enterprise Network
+Create network topology:
+- Internet cloud (10) at top
+- Firewall (100) below internet
+- Core Router (110) below firewall
+- Two switches: Switch A (200), Switch B (210)
+- Six workstations (300-350) connected to switches
+- Server (400) connected to core router
+Label security zones
+
+### Data Center Layout
+Draw data center network:
+- Redundant routers (100, 110) at top
+- Core switches (200, 210) in middle layer
+- Access switches (300-320) in bottom layer
+- Servers (400-430) connected to access layer
+Show redundant connections
+
+---
+
+## Patent-Specific Examples
+
+### Method Claim Diagram
+Generate a patent figure for method claim:
+- Receiving, by a processor, user authentication credentials (100)
+- Validating, by the processor, credentials against database (200)
+- Determining, by the processor, user access level (300)
+- Generating, by the processor, session token with encryption (400)
+- Transmitting, by the processor, token to client device (500)
+Use proper patent language in labels
+
+### System Diagram with Components
+Create a system architecture for patent:
+- Mobile device (100) with components: Display (110), Processor (120), Memory (130)
+- Communication module (140) for wireless transmission
+- Remote server (200) with: Database (210), AI Engine (220), API Module (230)
+- Show data flow between mobile and server
+Add reference numbers to all components and sub-components
+
+### Multi-User System
+Draw a patent diagram for collaboration system:
+- Central coordination server (100)
+- User A device (200) with local storage (210)
+- User B device (220) with local storage (230)
+- User C device (240) with local storage (250)
+- Shared cloud storage (300)
+- Sync engine (150) in server
+Show bidirectional sync arrows between all devices and server
+
+---
+
+## Complex Diagrams
+
+### Manufacturing Process
+Create flowchart for manufacturing system patent:
+- Raw material input (100)
+- Quality check 1 with decision (200, 210)
+- Processing station A (300)
+- Processing station B (310)
+- Assembly (400)
+- Quality check 2 with decision (500, 510)
+- If pass: Packaging (600)
+- If fail: Rework loop back to (300)
+- Final output (700)
+
+### Distributed Computing System
+Generate architecture for distributed system:
+- Frontend load balancer (100)
+- Web servers (200-220) behind load balancer
+- Application servers (300-320) in middle tier
+- Cache layer (400) with Redis instances (410-430)
+- Database cluster (500) with primary (510) and replicas (520-540)
+- Message queue system (600) for async tasks
+- Worker nodes (700-720) processing queue
+Show all connections and data flows
+
+### Security System Architecture
+Draw security monitoring system:
+- Video cameras (100-110) at entry points
+- Motion sensors (120-130) in zones
+- Central control unit (200) with AI processor (210)
+- Alert system (300) with notifications (310)
+- Cloud backup (400)
+- Mobile monitoring app (500)
+- Admin dashboard (600)
+Show alert flow when sensor triggers
+
+---
+
+## Refinement Examples
+(Use these after generating initial diagrams)
+
+### Size Adjustments
+- "Make the processing block 50% wider"
+- "Increase the size of the server box to 4 inches wide"
+- "Make all client rectangles smaller, about 1.5 inches"
+
+### Layout Changes
+- "Move the database to the right side"
+- "Arrange the three clients horizontally instead of vertically"
+- "Center all elements on the slide"
+
+### Content Modifications
+- "Add a new decision diamond between steps 2 and 3 asking 'Is valid?'"
+- "Change the label on box 100 to 'User Input Module (100)'"
+- "Add a dotted arrow from step 4 back to step 1 for error handling"
+
+### Styling
+- "Change the color of the server box to blue"
+- "Make all arrows thicker, width 2.5 points"
+- "Use dashed lines for all optional connections"
+
+---
+
+## Tips for Best Results
+
+1. **Be Specific**: Include reference numbers (100, 200, etc.)
+2. **Describe Layout**: "vertical flow", "horizontal arrangement", "centered"
+3. **Name Connections**: "bidirectional arrows", "one-way data flow"
+4. **Include Counts**: "3 clients", "5 sensors" (not "multiple" or "several")
+5. **Use Patent Language**: "receiving, by processor", "transmitting to device"
+6. **Specify Shapes**: "rectangle", "diamond for decision", "oval for terminator"
+
+## Bad vs Good Prompts
+
+❌ Bad: "Create a diagram for my system"
+✅ Good: "Create a block diagram showing a server (100) connected to 3 databases (110, 120, 130) with bidirectional arrows"
+
+❌ Bad: "Make a flowchart with some steps"
+✅ Good: "Create a vertical flowchart with 4 process blocks: Input (100), Validate (200), Process (300), Output (400), connected with arrows"
+
+❌ Bad: "Add more stuff to the diagram"
+✅ Good: "Add a new rectangle labeled 'Cache Layer (150)' between the API Gateway and Database, with arrows pointing both directions"
+
+---
+
+**These prompts will generate fully editable PowerPoint diagrams!**
+Every shape, arrow, and text box can be modified in PowerPoint after download.
