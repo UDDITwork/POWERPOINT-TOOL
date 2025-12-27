@@ -90,7 +90,7 @@ async def root():
     return {
         "status": "online",
         "service": "AI Patent Diagram Generator",
-        "version": "1.0.1",  # Updated to trigger deployment with anthropic 0.75.0+
+        "version": "1.0.2",  # Added debug endpoint to inspect Claude specs
         "timestamp": datetime.utcnow().isoformat()
     }
 
@@ -246,6 +246,27 @@ async def get_diagram_status(job_id: str):
         response.error = job.get("error")
 
     return response
+
+
+@app.get("/api/diagram/debug/{job_id}")
+async def debug_diagram_spec(job_id: str):
+    """
+    DEBUG ENDPOINT: Get the raw diagram spec from Claude.
+    This helps diagnose what Claude is actually returning.
+    """
+    if job_id not in job_store:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    job = job_store[job_id]
+    spec = job.get("diagram_spec", {})
+
+    return {
+        "job_id": job_id,
+        "status": job.get("status"),
+        "spec": spec,
+        "element_count": len(spec.get("elements", [])),
+        "elements_preview": spec.get("elements", [])[:3]  # First 3 elements
+    }
 
 
 @app.get("/api/diagram/download/{filename}")
