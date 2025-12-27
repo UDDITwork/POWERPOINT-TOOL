@@ -362,7 +362,7 @@ CRITICAL JSON REQUIREMENTS:
                 },
                 extra_body={
                     "output_format": {
-                        "type": "json",
+                        "type": "json_schema",  # CORRECTED from "json"
                         "schema": DiagramSpec.model_json_schema()  # Enforce Pydantic schema
                     }
                 }
@@ -434,7 +434,7 @@ CRITICAL JSON REQUIREMENTS:
                 },
                 extra_body={
                     "output_format": {
-                        "type": "json",
+                        "type": "json_schema",  # CORRECTED from "json"
                         "schema": DiagramSpec.model_json_schema()  # Enforce Pydantic schema
                     }
                 }

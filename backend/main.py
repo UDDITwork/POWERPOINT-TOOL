@@ -402,7 +402,8 @@ def generate_diagram_sync(
         options: Optional generation options
     """
     try:
-        logger.info(f"Starting diagram generation for job {job_id}")
+        logger.info(f"[JOB {job_id}] Starting diagram generation")
+        logger.info(f"[JOB {job_id}] Prompt: {prompt[:200]}...")
 
         # Update status
         job_store[job_id]["status"] = "processing"
@@ -410,19 +411,23 @@ def generate_diagram_sync(
         job_store[job_id]["progress"] = 10
 
         # Step 1: Generate spec with Claude
+        logger.info(f"[JOB {job_id}] Calling Claude API...")
         spec = claude_agent.generate_diagram_spec(prompt)
+        logger.info(f"[JOB {job_id}] Claude response received, elements: {len(spec.get('elements', []))}")
 
         job_store[job_id]["diagram_spec"] = spec
         job_store[job_id]["progress"] = 50
         job_store[job_id]["message"] = "Building PowerPoint diagram..."
 
         # Step 2: Generate PPTX with python-pptx
+        logger.info(f"[JOB {job_id}] Generating PPTX...")
         generator = PPTXDiagramGenerator()
         generator.create_from_json(spec)
 
         # Save file
         output_path = STORAGE_PATH / f"{job_id}.pptx"
         generator.save(str(output_path))
+        logger.info(f"[JOB {job_id}] PPTX saved to {output_path}")
 
         job_store[job_id]["progress"] = 90
         job_store[job_id]["message"] = "Finalizing..."
@@ -437,13 +442,15 @@ def generate_diagram_sync(
         job_store[job_id]["file_path"] = str(output_path)
         job_store[job_id]["completed_at"] = datetime.utcnow().isoformat()
 
-        logger.info(f"Diagram generation completed for job {job_id}")
+        logger.info(f"[JOB {job_id}] ✅ Diagram generation completed successfully")
 
     except Exception as e:
-        logger.error(f"Error generating diagram for job {job_id}: {e}", exc_info=True)
+        logger.error(f"[JOB {job_id}] ❌ Error generating diagram: {e}", exc_info=True)
+        logger.error(f"[JOB {job_id}] Error type: {type(e).__name__}")
+        logger.error(f"[JOB {job_id}] Error details: {str(e)}")
 
         job_store[job_id]["status"] = "failed"
-        job_store[job_id]["error"] = str(e)
+        job_store[job_id]["error"] = f"{type(e).__name__}: {str(e)}"
         job_store[job_id]["message"] = "Diagram generation failed"
 
 

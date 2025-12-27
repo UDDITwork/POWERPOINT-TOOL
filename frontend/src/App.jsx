@@ -87,8 +87,8 @@ function App() {
         {loading && status && (
           <div className="status-card">
             <div className="progress-bar">
-              <div 
-                className="progress-fill" 
+              <div
+                className="progress-fill"
                 style={{ width: `${status.progress || 0}%` }}
               />
             </div>
@@ -96,6 +96,12 @@ function App() {
               <span>{status.message || 'Processing...'}</span>
               <span className="progress-percent">{status.progress || 0}%</span>
             </div>
+            {status.error && (
+              <div className="error-details" style={{marginTop: '10px', fontSize: '12px', color: '#c33'}}>
+                <strong>Debug Info:</strong><br/>
+                {status.error}
+              </div>
+            )}
           </div>
         )}
 
