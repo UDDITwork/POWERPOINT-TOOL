@@ -311,23 +311,28 @@ CRITICAL JSON REQUIREMENTS:
         api_key: str,
         model: str = "claude-sonnet-4-5",
         max_tokens: int = 4096,
-        temperature: float = 0.7
+        temperature: float = 0.0  # Changed from 0.7 - deterministic for JSON
     ):
         """
-        Initialize the Claude agent.
+        Initialize the Claude agent with Structured Outputs support.
 
         Args:
             api_key: Anthropic API key
             model: Claude model to use
             max_tokens: Maximum tokens in response
-            temperature: Creativity level (0.0-1.0)
+            temperature: Creativity level (0.0 for JSON generation)
         """
-        self.client = anthropic.Anthropic(api_key=api_key)
+        self.client = anthropic.Anthropic(
+            api_key=api_key,
+            default_headers={
+                "anthropic-beta": "structured-outputs-2025-11-13"  # Enable Structured Outputs
+            }
+        )
         self.model = model
         self.max_tokens = max_tokens
         self.temperature = temperature
 
-        logger.info(f"Initialized Claude agent with model: {model}")
+        logger.info(f"Initialized Claude agent with model: {model} (Structured Outputs enabled)")
 
     def generate_diagram_spec(self, prompt: str) -> Dict[str, Any]:
         """
@@ -349,25 +354,29 @@ CRITICAL JSON REQUIREMENTS:
             response = self.client.messages.create(
                 model=self.model,
                 max_tokens=self.max_tokens,
-                temperature=self.temperature,
+                temperature=0.0,  # Deterministic for JSON generation
                 system=self.SYSTEM_PROMPT,
                 messages=[
                     {
                         "role": "user",
                         "content": prompt
                     }
-                ]
+                ],
+                output_format={
+                    "type": "json",
+                    "schema": DiagramSpec.model_json_schema()  # Enforce Pydantic schema
+                }
             )
 
-            # Extract JSON from response
-            response_text = response.content[0].text.strip()
+            # Response is guaranteed valid JSON matching DiagramSpec schema
+            response_text = response.content[0].text
 
-            logger.debug(f"Claude response: {response_text[:200]}...")
+            logger.debug(f"Claude response (Structured Output): {response_text[:200]}...")
 
-            # Parse JSON
-            spec = self._extract_json(response_text)
+            # Direct parse - no cleaning needed with Structured Outputs
+            spec = json.loads(response_text)
 
-            # Validate spec
+            # Validate spec (should always pass with Structured Outputs)
             validated_spec = DiagramSpec(**spec)
 
             logger.info(f"Successfully generated spec with {len(validated_spec.elements)} elements")
@@ -412,20 +421,25 @@ CRITICAL JSON REQUIREMENTS:
             response = self.client.messages.create(
                 model=self.model,
                 max_tokens=self.max_tokens,
-                temperature=self.temperature,
+                temperature=0.0,  # Deterministic for JSON generation
                 system=system_prompt,
                 messages=[
                     {
                         "role": "user",
                         "content": f"Apply this refinement: {refinement_prompt}"
                     }
-                ]
+                ],
+                output_format={
+                    "type": "json",
+                    "schema": DiagramSpec.model_json_schema()  # Enforce Pydantic schema
+                }
             )
 
-            response_text = response.content[0].text.strip()
-            spec = self._extract_json(response_text)
+            # Response is guaranteed valid JSON matching DiagramSpec schema
+            response_text = response.content[0].text
+            spec = json.loads(response_text)  # Direct parse - no cleaning needed
 
-            # Validate
+            # Validate (should always pass with Structured Outputs)
             validated_spec = DiagramSpec(**spec)
 
             logger.info("Successfully refined diagram")
