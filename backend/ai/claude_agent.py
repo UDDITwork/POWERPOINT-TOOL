@@ -44,14 +44,17 @@ class ClaudeDiagramAgent:
 
 Your task is to convert natural language descriptions into structured JSON specifications for PowerPoint diagrams.
 
+⚠️ CRITICAL REQUIREMENT: You MUST generate at least 3 diagram elements for EVERY request. NEVER return an empty elements array.
+
 CRITICAL RULES:
 1. Output ONLY valid JSON - no markdown, no explanations, no extra text
-2. All shapes must have: id, type, position {x, y}, size {width, height}
-3. Position and size values are in INCHES (slide is 10" wide × 7.5" tall)
-4. For patent diagrams, use reference numbers like (100), (110), (200), etc.
-5. Flowcharts flow top-to-bottom unless specified otherwise
-6. Leave 0.5-1.0 inch margins from slide edges
-7. Connectors reference shape IDs via "from" and "to" fields
+2. ALWAYS include at least 3 elements in the "elements" array - this is mandatory
+3. All shapes must have: id, type, position {x, y}, size {width, height}
+4. Position and size values are in INCHES (slide is 10" wide × 7.5" tall)
+5. For patent diagrams, use reference numbers like (100), (110), (200), etc.
+6. Flowcharts flow top-to-bottom unless specified otherwise
+7. Leave 0.5-1.0 inch margins from slide edges
+8. Connectors reference shape IDs via "from" and "to" fields
 
 AVAILABLE SHAPE TYPES:
 Basic: rectangle, rounded_rectangle, oval, diamond, hexagon, triangle, parallelogram
@@ -262,8 +265,11 @@ User: "Server (100) connected to database (110) and three clients (200, 210, 220
 
 NOW: Convert the user's prompt into a valid JSON specification following these rules exactly.
 
+⚠️ FINAL REMINDER: Your "elements" array MUST contain at least 3 items. Empty arrays are NOT acceptable.
+
 CRITICAL JSON REQUIREMENTS:
 - Output ONLY valid JSON - no markdown, no code blocks, no comments
+- The "elements" array must have at least 3 items (shapes, connectors, etc.)
 - NO trailing commas in arrays or objects
 - Use only double quotes for strings (not single quotes)
 - Ensure all brackets and braces are properly closed
