@@ -1,0 +1,160 @@
+================================================================================
+CLOUD RUN BUILDPACK - BACKEND ENTRY CONFIGURATION VERIFIED
+================================================================================
+
+Source Directory: /backend (set this in Cloud Run configuration)
+
+================================================================================
+ENTRY FILES CONFIGURATION
+================================================================================
+
+✓ Procfile
+  Location: backend/Procfile
+  Command:  web: uvicorn main:app --host 0.0.0.0 --port $PORT
+  
+  What it does:
+  - Tells Cloud Run to start uvicorn web server
+  - Binds to 0.0.0.0 (all interfaces)
+  - Uses $PORT environment variable from Cloud Run
+  - Loads the FastAPI app from main.py
+
+✓ runtime.txt
+  Location: backend/runtime.txt
+  Content:  python-3.11.14
+  
+  What it does:
+  - Cloud Build Buildpack detects this file
+  - Installs Python 3.11.14
+  - Sets up Python environment
+
+✓ requirements.txt
+  Location: backend/requirements.txt
+  Lines:    71 (all pure Python packages)
+  
+  What it does:
+  - Cloud Build installs all dependencies
+  - No C++ compiler needed
+  - Includes: fastapi, uvicorn, anthropic, python-pptx
+
+✓ main.py
+  Location: backend/main.py
+  Entry:    main:app (FastAPI application)
+  
+  Module structure:
+  - main.py imports from: ai/, diagram_engine/, models/
+  - All subdirectories have __init__.py
+  - Relative imports work correctly
+
+✓ Directory structure:
+  backend/
+  ├── main.py                 (FastAPI app entry point)
+  ├── Procfile                (Cloud Run start command)
+  ├── runtime.txt             (Python version)
+  ├── requirements.txt        (Dependencies)
+  ├── .gcloudignore           (Exclude files from build)
+  ├── .env                    (Local dev only - not deployed)
+  │
+  ├── ai/
+  │   ├── __init__.py         ✓
+  │   ├── claude_agent.py
+  │   ├── elite_agent.py
+  │   └── advanced_prompts.py
+  │
+  ├── diagram_engine/
+  │   ├── __init__.py         ✓
+  │   ├── pptx_generator.py
+  │   ├── layout_engine.py
+  │   ├── advanced_layout.py
+  │   └── unified_pipeline.py
+  │
+  ├── models/
+  │   ├── __init__.py         ✓
+  │   └── schemas.py
+  │
+  ├── storage/
+  │   └── __init__.py         ✓
+  │
+  ├── tasks/
+  │   └── __init__.py         ✓
+  │
+  └── utils/
+      └── __init__.py         ✓
+
+================================================================================
+HOW CLOUD RUN BUILDPACK WORKS WITH /backend SOURCE
+================================================================================
+
+Step 1: You configure Cloud Run with source directory: /backend
+
+Step 2: Cloud Build clones your GitHub repo and enters /backend directory
+
+Step 3: Cloud Build Buildpack detects:
+  - runtime.txt → "This is a Python app, version 3.11.14"
+  - requirements.txt → "Install these dependencies"
+  - Procfile → "Use this command to start the app"
+
+Step 4: Cloud Build installs Python 3.11.14 and runs:
+  pip install -r requirements.txt
+
+Step 5: Cloud Build creates container with:
+  - Python 3.11.14
+  - All installed dependencies
+  - Your backend/ code
+  - Entry command from Procfile
+
+Step 6: Cloud Run starts container and executes:
+  uvicorn main:app --host 0.0.0.0 --port $PORT
+  (Where $PORT is provided by Cloud Run, typically 8080)
+
+Step 7: Uvicorn loads:
+  - Imports main.py from current directory
+  - Finds 'app' variable (FastAPI instance)
+  - Starts web server on Cloud Run's port
+
+================================================================================
+VERIFICATION CHECKLIST
+================================================================================
+
+When setting up Cloud Run GitHub integration:
+
+✓ Repository: UDDITwork/POWERPOINT-TOOL
+✓ Branch: main
+✓ Build type: Buildpacks (NOT Dockerfile)
+✓ Source location: /backend (IMPORTANT!)
+
+Environment variables to set:
+✓ ANTHROPIC_API_KEY (from Secret Manager)
+✓ ANTHROPIC_MODEL = claude-sonnet-4.5-20250929
+✓ BACKEND_HOST = 0.0.0.0
+✓ LOG_LEVEL = info
+
+Container settings:
+✓ Memory: 2 GiB
+✓ CPU: 2
+✓ Timeout: 600 seconds
+✓ Max instances: 15
+
+================================================================================
+ENTRY POINT VALIDATION
+================================================================================
+
+Command in Procfile:
+  web: uvicorn main:app --host 0.0.0.0 --port $PORT
+
+This translates to:
+  uvicorn           → ASGI web server
+  main              → import main.py from /backend
+  :app              → get 'app' variable from main.py
+  --host 0.0.0.0    → listen on all network interfaces
+  --port $PORT      → use Cloud Run's assigned port
+
+The app variable in main.py is:
+  app = FastAPI(title="AI Patent Diagram Generator", ...)
+
+================================================================================
+ALL ENTRY FILES ARE CORRECTLY CONFIGURED FOR CLOUD RUN!
+================================================================================
+
+Ready to deploy via GitHub integration with /backend as source directory.
+
+================================================================================

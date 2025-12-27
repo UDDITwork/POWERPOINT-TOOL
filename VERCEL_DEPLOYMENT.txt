@@ -1,0 +1,117 @@
+================================================================================
+VERCEL FRONTEND DEPLOYMENT
+================================================================================
+
+Backend URL: https://powerpoint-tool-282996737766.asia-south1.run.app
+
+================================================================================
+DEPLOYMENT OPTIONS
+================================================================================
+
+OPTION 1: Vercel Dashboard (Recommended)
+-----------------------------------------
+
+1. Go to: https://vercel.com/new
+
+2. Import your GitHub repository:
+   - Repository: UDDITwork/POWERPOINT-TOOL
+
+3. Configure project:
+   - Framework Preset: Vite
+   - Root Directory: frontend
+   - Build Command: npm run build (auto-detected)
+   - Output Directory: dist (auto-detected)
+
+4. Add Environment Variable:
+   - Name: VITE_API_URL
+   - Value: https://powerpoint-tool-282996737766.asia-south1.run.app
+   - Environments: Production, Preview, Development (select all)
+
+5. Click "Deploy"
+
+6. Wait 2-3 minutes
+
+7. Your app will be live at: https://your-app.vercel.app
+
+
+OPTION 2: Vercel CLI
+--------------------
+
+1. Install Vercel CLI:
+   npm install -g vercel
+
+2. Login:
+   vercel login
+
+3. Navigate to frontend:
+   cd frontend
+
+4. Deploy:
+   vercel --prod
+
+5. When prompted for environment variables:
+   VITE_API_URL = https://powerpoint-tool-282996737766.asia-south1.run.app
+
+6. Deployment complete!
+
+================================================================================
+ENVIRONMENT VARIABLE SETUP
+================================================================================
+
+The frontend needs to know where the backend is:
+
+Variable: VITE_API_URL
+Value: https://powerpoint-tool-282996737766.asia-south1.run.app
+
+This has been saved in:
+✓ frontend/.env.production
+✓ frontend/.env
+
+When you deploy to Vercel, make sure to add this environment variable
+in the Vercel dashboard or it will default to http://localhost:8000
+
+================================================================================
+TESTING AFTER DEPLOYMENT
+================================================================================
+
+1. Open your Vercel URL
+
+2. Test prompt:
+   Create a computer system with:
+   - Computer System (100) containing:
+     - Processor (110)
+     - Memory (120)
+
+3. Click "Generate Diagram"
+
+4. Watch the progress bar
+
+5. Download the .pptx file
+
+6. Open in PowerPoint and verify all shapes are editable
+
+================================================================================
+CORS CONFIGURATION CHECK
+================================================================================
+
+Your backend .env has CORS configured:
+ALLOWED_ORIGINS=http://localhost:5173,http://localhost:3000,http://localhost:8000
+
+After deploying frontend, you may need to add your Vercel URL:
+
+Update backend/.env:
+ALLOWED_ORIGINS=http://localhost:5173,https://your-app.vercel.app,https://powerpoint-tool-282996737766.asia-south1.run.app
+
+Then redeploy backend (git push will trigger automatic deployment)
+
+================================================================================
+AUTOMATIC DEPLOYMENT
+================================================================================
+
+After initial setup, every git push will:
+
+✓ Trigger Vercel build
+✓ Deploy new version automatically
+✓ No manual steps needed
+
+================================================================================

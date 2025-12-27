@@ -1,0 +1,169 @@
+================================================================================
+DEPLOYMENT GUIDE - GITHUB + CLOUD RUN + VERCEL (CI/CD)
+================================================================================
+
+This uses AUTOMATIC deployment via:
+- GitHub repository integration
+- Google Cloud Run with Cloud Build Packs (NO Docker)
+- Vercel with GitHub integration  
+- Automatic CI/CD on every git push
+
+Repository: https://github.com/UDDITwork/POWERPOINT-TOOL
+
+================================================================================
+PART 1: DEPLOY BACKEND TO GOOGLE CLOUD RUN
+================================================================================
+
+METHOD: GitHub Integration (Recommended - Automatic CI/CD)
+
+STEP 1: One-Time Google Cloud Setup
+-----------------------------------
+
+1. Go to Google Cloud Console: https://console.cloud.google.com
+
+2. Create/Select Project:
+   - Create new project OR select existing
+   - Note your PROJECT_ID
+
+3. Enable APIs:
+   - Cloud Run API
+   - Cloud Build API  
+   - Secret Manager API
+
+4. Create API Secret:
+   - Go to Secret Manager
+   - CREATE SECRET
+   - Name: anthropic-api-key
+   - Secret value: [YOUR ANTHROPIC API KEY]
+   - CREATE
+
+STEP 2: Connect GitHub to Cloud Run
+-----------------------------------
+
+1. Go to Cloud Run console
+
+2. CREATE SERVICE
+
+3. Select: "Continuously deploy from a repository (source)"
+
+4. SET UP WITH CLOUD BUILD:
+   - Grant Cloud Build access to GitHub
+   - Repository: UDDITwork/POWERPOINT-TOOL
+   - Branch: main
+   - Build type: Buildpacks (NO Dockerfile!)
+   - Source location: /backend
+   - SAVE
+
+5. Configure Service:
+   - Service name: patent-diagram-api
+   - Region: us-central1
+   - Allow unauthenticated invocations
+   - Memory: 2 GiB
+   - CPU: 2
+   - Timeout: 600 seconds
+   - Max instances: 15
+
+6. Environment Variables:
+   - ANTHROPIC_MODEL = claude-sonnet-4.5-20250929
+   - BACKEND_HOST = 0.0.0.0
+   - LOG_LEVEL = info
+
+7. Secret Reference:
+   - REFERENCE A SECRET
+   - Secret: anthropic-api-key
+   - Exposed as: ANTHROPIC_API_KEY
+
+8. CREATE and wait 2-5 minutes
+
+9. Copy your backend URL
+
+HOW IT WORKS:
+-------------
+After setup, every git push triggers:
+1. Cloud Build detects changes
+2. Reads runtime.txt (Python 3.11.14)
+3. Installs requirements.txt
+4. Uses Procfile to start app
+5. Deploys to Cloud Run
+
+================================================================================
+PART 2: DEPLOY FRONTEND TO VERCEL
+================================================================================
+
+1. Go to Vercel and sign in with GitHub
+
+2. New Project > Import: UDDITwork/POWERPOINT-TOOL
+
+3. Configure:
+   - Framework: Vite
+   - Root Directory: frontend
+   - Environment Variable:
+     VITE_API_URL = [YOUR CLOUD RUN URL]
+
+4. Deploy and wait 2-3 minutes
+
+5. Copy your Vercel URL
+
+HOW IT WORKS:
+-------------
+Every git push triggers:
+1. Vercel detects changes
+2. Runs npm install
+3. Runs npm run build
+4. Deploys automatically
+
+================================================================================
+KEY FILES FOR DEPLOYMENT
+================================================================================
+
+backend/Procfile:
+- Tells Cloud Run startup command
+- Content: web: uvicorn main:app --host 0.0.0.0 --port $PORT
+
+backend/runtime.txt:
+- Python version for Cloud Build
+- Content: python-3.11.14
+
+backend/.gcloudignore:
+- Files excluded from deployment
+
+backend/requirements.txt:
+- Python dependencies (100% pure Python)
+
+frontend/package.json:
+- Node.js dependencies
+
+================================================================================
+UPDATING DEPLOYMENT
+================================================================================
+
+To update:
+1. git add .
+2. git commit -m "message"
+3. git push
+
+Both backend and frontend deploy automatically!
+
+================================================================================
+MONITORING
+================================================================================
+
+Cloud Run:
+- https://console.cloud.google.com/run
+
+Vercel:
+- https://vercel.com/dashboard
+
+Cloud Build History:
+- https://console.cloud.google.com/cloud-build/builds
+
+================================================================================
+COST (10,000 diagrams/month)
+================================================================================
+
+Cloud Run: $1-5/month
+Vercel: Free
+Anthropic API: $30-50/month
+TOTAL: $30-55/month
+
+================================================================================

@@ -58,7 +58,7 @@ function App() {
 
   const handleDownload = () => {
     if (jobId) {
-      window.open(`${API_URL}/api/diagram/download/${jobId}`, '_blank')
+      window.open(`${API_URL}/api/diagram/download/${jobId}.pptx`, '_blank')
     }
   }
 

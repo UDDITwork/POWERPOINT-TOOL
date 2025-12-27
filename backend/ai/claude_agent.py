@@ -260,6 +260,15 @@ User: "Server (100) connected to database (110) and three clients (200, 210, 220
 }
 
 NOW: Convert the user's prompt into a valid JSON specification following these rules exactly.
+
+CRITICAL JSON REQUIREMENTS:
+- Output ONLY valid JSON - no markdown, no code blocks, no comments
+- NO trailing commas in arrays or objects
+- Use only double quotes for strings (not single quotes)
+- Ensure all brackets and braces are properly closed
+- No comments (// or /* */) anywhere in the JSON
+- Numbers must be valid (no NaN, Infinity)
+- Return the raw JSON object directly without wrapping
 """
 
     REFINEMENT_PROMPT_TEMPLATE = """You are refining an existing diagram based on user feedback.
@@ -286,6 +295,15 @@ Common refinements:
 - "Remove X" → Remove element from array
 
 OUTPUT: Complete updated JSON specification
+
+CRITICAL JSON REQUIREMENTS:
+- Output ONLY valid JSON - no markdown, no code blocks, no comments
+- NO trailing commas in arrays or objects
+- Use only double quotes for strings (not single quotes)
+- Ensure all brackets and braces are properly closed
+- No comments (// or /* */) anywhere in the JSON
+- Numbers must be valid (no NaN, Infinity)
+- Return the raw JSON object directly without wrapping
 """
 
     def __init__(
@@ -420,7 +438,7 @@ OUTPUT: Complete updated JSON specification
 
     def _extract_json(self, text: str) -> Dict[str, Any]:
         """
-        Extract JSON from Claude's response, handling markdown code blocks.
+        Extract JSON from Claude's response with aggressive error handling.
 
         Args:
             text: Response text that may contain JSON
@@ -428,6 +446,8 @@ OUTPUT: Complete updated JSON specification
         Returns:
             Parsed JSON dictionary
         """
+        import re
+
         # Remove markdown code blocks if present
         if "```json" in text:
             start = text.find("```json") + 7
@@ -438,34 +458,72 @@ OUTPUT: Complete updated JSON specification
             end = text.find("```", start)
             text = text[start:end].strip()
 
-        # Clean up common JSON issues
-        import re
+        # Aggressive JSON cleaning
 
-        # Remove trailing commas before closing braces/brackets
-        text = re.sub(r',(\s*[}\]])', r'\1', text)
+        # 1. Remove all types of comments
+        text = re.sub(r'//[^\n]*', '', text)  # Single-line comments
+        text = re.sub(r'/\*.*?\*/', '', text, flags=re.DOTALL)  # Multi-line comments
 
-        # Remove comments (sometimes Claude adds them)
-        text = re.sub(r'//.*?\n', '\n', text)
-        text = re.sub(r'/\*.*?\*/', '', text, flags=re.DOTALL)
-
-        # Fix common Unicode issues
+        # 2. Fix Unicode characters
         text = text.replace('\u2019', "'")  # Right single quote
         text = text.replace('\u201c', '"')  # Left double quote
         text = text.replace('\u201d', '"')  # Right double quote
+        text = text.replace('\u2018', "'")  # Left single quote
+        text = text.replace('\u2013', '-')  # En dash
+        text = text.replace('\u2014', '-')  # Em dash
+        text = text.replace('\u00a0', ' ')  # Non-breaking space
+
+        # 3. Remove trailing commas before closing brackets/braces (aggressive)
+        # This handles multiple cases: , }, , ], ,  }, etc.
+        text = re.sub(r',(\s*[}\]])', r'\1', text)
+        # Handle nested cases
+        text = re.sub(r',(\s*[}\]])', r'\1', text)  # Run twice for nested
+
+        # 4. Fix common malformed patterns
+        text = re.sub(r',\s*,', ',', text)  # Double commas
+        text = re.sub(r':\s*,', ': null,', text)  # Empty values
+        text = re.sub(r'{\s*,', '{', text)  # Comma at start of object
+        text = re.sub(r'\[\s*,', '[', text)  # Comma at start of array
+
+        # 5. Remove any text before first { or [
+        first_brace = text.find('{')
+        first_bracket = text.find('[')
+        if first_brace != -1 and (first_bracket == -1 or first_brace < first_bracket):
+            text = text[first_brace:]
+        elif first_bracket != -1:
+            text = text[first_bracket:]
+
+        # 6. Remove any text after last } or ]
+        last_brace = text.rfind('}')
+        last_bracket = text.rfind(']')
+        if last_brace > last_bracket:
+            text = text[:last_brace + 1]
+        elif last_bracket != -1:
+            text = text[:last_bracket + 1]
 
         # Try to parse
         try:
             return json.loads(text)
         except json.JSONDecodeError as e:
-            # Log detailed error info
+            # Detailed error logging
             logger.error(f"JSON parse error at line {e.lineno} column {e.colno}: {e.msg}")
-            logger.error(f"Character at error: {repr(text[e.pos:e.pos+10]) if e.pos < len(text) else 'EOF'}")
+            logger.error(f"Character at error: {repr(text[e.pos:e.pos+20]) if e.pos < len(text) else 'EOF'}")
 
-            # Show error line
+            # Show context around error
             lines = text.split('\n')
             if e.lineno <= len(lines):
-                logger.error(f"Line {e.lineno}: {lines[e.lineno - 1]}")
-                logger.error(f"{' ' * (e.colno - 1)}^")
+                start_line = max(0, e.lineno - 3)
+                end_line = min(len(lines), e.lineno + 2)
+                logger.error("Context:")
+                for i in range(start_line, end_line):
+                    prefix = ">>> " if i == e.lineno - 1 else "    "
+                    logger.error(f"{prefix}{i + 1}: {lines[i]}")
+                    if i == e.lineno - 1:
+                        logger.error(f"    {' ' * len(str(i + 1))}  {' ' * (e.colno - 1)}^")
+
+            # Log the cleaned JSON for debugging
+            logger.error(f"Cleaned JSON (first 500 chars): {text[:500]}")
+            logger.error(f"Cleaned JSON (last 500 chars): {text[-500:]}")
 
             raise ValueError(f"Invalid JSON from Claude: {e.msg} at line {e.lineno} column {e.colno}")
 

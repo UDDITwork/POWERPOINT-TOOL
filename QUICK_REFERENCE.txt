@@ -1,0 +1,59 @@
+================================================================================
+QUICK REFERENCE CARD
+================================================================================
+
+BACKEND (DEPLOYED)
+URL: https://powerpoint-tool-282996737766.asia-south1.run.app
+Status: ✓ Running
+
+FRONTEND (READY TO DEPLOY)
+Environment Variable: VITE_API_URL = https://powerpoint-tool-282996737766.asia-south1.run.app
+Deploy at: https://vercel.com/new
+
+================================================================================
+DEPLOY FRONTEND NOW
+================================================================================
+
+Option 1: Vercel Dashboard (2 minutes)
+  1. Visit: https://vercel.com/new
+  2. Import: UDDITwork/POWERPOINT-TOOL
+  3. Root Directory: frontend
+  4. Framework: Vite
+  5. Add env var: VITE_API_URL = https://powerpoint-tool-282996737766.asia-south1.run.app
+  6. Deploy
+
+Option 2: Vercel CLI
+  cd frontend
+  vercel --prod
+
+================================================================================
+AFTER VERCEL DEPLOYMENT
+================================================================================
+
+1. Copy your Vercel URL (e.g., https://your-app.vercel.app)
+
+2. Update backend CORS in backend/.env:
+   ALLOWED_ORIGINS=http://localhost:5173,https://your-app.vercel.app,https://powerpoint-tool-282996737766.asia-south1.run.app
+
+3. Push to GitHub:
+   git add backend/.env
+   git commit -m "Add Vercel URL to CORS"
+   git push
+
+4. Cloud Run auto-redeploys (2-3 min)
+
+5. Test your app at your Vercel URL
+
+================================================================================
+TESTING
+================================================================================
+
+Test prompt:
+Create a computer system with:
+- Computer System (100) containing:
+  - Processor (110)
+  - Memory (120)
+
+Expected: Download editable .pptx file
+
+================================================================================
