@@ -4,11 +4,16 @@ Anthropic Claude AI Agent for Patent Diagram Generation
 This module uses Claude to parse natural language prompts and generate
 structured JSON specifications for PowerPoint diagrams.
 
+NEW ARCHITECTURE (v2):
+- Claude generates LOGICAL structure with position HINTS
+- Layout engine calculates actual positions with collision detection
+- Validation loop ensures no overlaps or missing connections
+
 Features:
 - Intelligent prompt analysis
 - Patent-aware diagram conventions
-- Layout optimization
-- Iterative refinement support
+- Position hints (relative positioning, not coordinates)
+- Layout engine integration
 
 Author: AI Patent Diagram Generator
 License: MIT
@@ -18,28 +23,249 @@ import anthropic
 from anthropic import transform_schema
 import json
 import logging
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Union
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
 
+# ============ NEW v2 MODELS (Hints-based) ============
+
+class NodeStyle(BaseModel):
+    """Style properties for a node."""
+    fill_color: Optional[str] = Field(None, description="Fill color as hex (e.g., 'FFFFFF', '4472C4')")
+    line_color: Optional[str] = Field(None, description="Border color as hex")
+    line_width: Optional[float] = Field(None, description="Border width in points")
+
+
+class DiagramNode(BaseModel):
+    """A single node in the diagram (shape)."""
+    id: str = Field(..., description="Unique node ID (e.g., 'node1', 'step_100')")
+    type: str = Field(..., description="Shape type: rectangle, oval, diamond, process, decision, terminator, etc.")
+    text: str = Field(..., description="Text label for the node")
+    hint: Optional[str] = Field(None, description="Position hint: 'top', 'left', 'center', 'below:nodeId', 'right-of:nodeId', 'same-row:nodeId'")
+    size_hint: Optional[str] = Field(None, description="Size hint: 'small', 'medium', 'large', 'wide', 'tall'")
+    style: Optional[NodeStyle] = Field(None, description="Visual style")
+
+
+class DiagramEdge(BaseModel):
+    """A connection between two nodes."""
+    id: str = Field(..., description="Unique edge ID")
+    from_node: str = Field(..., alias="from", description="Source node ID")
+    to_node: str = Field(..., alias="to", description="Target node ID")
+    label: Optional[str] = Field(None, description="Edge label (e.g., 'Yes', 'No', 'Data')")
+    style: Optional[NodeStyle] = Field(None, description="Line style")
+
+    class Config:
+        populate_by_name = True
+
+
+class DiagramMetadataV2(BaseModel):
+    """Metadata about the diagram."""
+    title: Optional[str] = Field(None, description="Diagram title")
+    diagram_type: str = Field(..., description="Type: flowchart, block_diagram, network, hierarchy")
+    direction: Optional[str] = Field("DOWN", description="Flow direction: DOWN, RIGHT, UP, LEFT")
+
+
+class DiagramSpecV2(BaseModel):
+    """V2 diagram spec: nodes + edges (no positions - layout engine handles that)."""
+    metadata: DiagramMetadataV2
+    nodes: List[DiagramNode] = Field(..., min_length=1, description="List of nodes/shapes")
+    edges: List[DiagramEdge] = Field(default_factory=list, description="List of connections")
+
+
+# ============ LEGACY v1 MODELS (for backward compatibility) ============
+
+class Position(BaseModel):
+    """Position in inches on the slide."""
+    x: float = Field(..., ge=0, le=10, description="X position in inches")
+    y: float = Field(..., ge=0, le=7.5, description="Y position in inches")
+
+
+class Size(BaseModel):
+    """Size in inches."""
+    width: float = Field(..., gt=0, le=10, description="Width in inches")
+    height: float = Field(..., gt=0, le=7.5, description="Height in inches")
+
+
+class ElementStyle(BaseModel):
+    """Style properties for an element."""
+    fill_color: Optional[str] = Field(None, description="Fill color as hex (e.g., 'FFFFFF')")
+    line_color: Optional[str] = Field(None, description="Line color as hex")
+    line_width: Optional[float] = Field(None, description="Line width in points")
+
+
+class DiagramElement(BaseModel):
+    """A single diagram element (shape or connector) - LEGACY."""
+    id: str = Field(..., description="Unique element ID")
+    type: str = Field(..., description="Element type (rectangle, oval, connector, etc.)")
+    position: Optional[Position] = Field(None, description="Position on slide (for shapes)")
+    size: Optional[Size] = Field(None, description="Size of element (for shapes)")
+    text: Optional[str] = Field(None, description="Text label")
+    style: Optional[ElementStyle] = Field(None, description="Style properties")
+    connector_type: Optional[str] = Field(None, description="Connector type (straight, elbow, curve)")
+    from_id: Optional[str] = Field(None, alias="from", description="Source shape ID for connectors")
+    to_id: Optional[str] = Field(None, alias="to", description="Target shape ID for connectors")
+
+    class Config:
+        populate_by_name = True
+
+
+class DiagramMetadata(BaseModel):
+    """Metadata about the diagram."""
+    title: Optional[str] = Field(None, description="Diagram title")
+    diagram_type: Optional[str] = Field(None, description="Type of diagram")
+
+
+class DiagramLayout(BaseModel):
+    """Layout configuration."""
+    type: Optional[str] = Field("manual", description="Layout type")
+    direction: Optional[str] = Field(None, description="Flow direction")
+
+
 class DiagramSpec(BaseModel):
-    """Pydantic model for diagram specification validation."""
-    metadata: Dict[str, Any] = Field(default_factory=dict)
-    elements: List[Dict[str, Any]] = Field(default_factory=list)
-    layout: Dict[str, Any] = Field(default_factory=dict)
+    """Pydantic model for diagram specification validation - LEGACY."""
+    metadata: DiagramMetadata = Field(default_factory=DiagramMetadata)
+    elements: List[DiagramElement] = Field(..., min_length=1, description="List of diagram elements")
+    layout: DiagramLayout = Field(default_factory=DiagramLayout)
 
 
 class ClaudeDiagramAgent:
     """
     AI agent powered by Anthropic Claude for diagram generation.
 
+    V2 ARCHITECTURE:
+    - Claude generates LOGICAL structure (nodes + edges with position HINTS)
+    - Layout engine calculates actual positions with collision detection
+    - No more direct coordinate generation from Claude
+
     The agent understands patent diagram conventions and generates
     structured JSON specifications that can be rendered by python-pptx.
     """
 
-    # System prompt for diagram generation
+    # V2 System prompt - Claude generates structure with HINTS, not coordinates
+    SYSTEM_PROMPT_V2 = """You are an expert AI assistant specialized in creating patent diagram specifications.
+
+Your task is to convert natural language descriptions into a LOGICAL STRUCTURE with nodes and edges.
+⚠️ IMPORTANT: You do NOT generate x,y coordinates. A layout engine will calculate positions automatically.
+
+OUTPUT FORMAT:
+{
+  "metadata": {
+    "title": "Diagram Title",
+    "diagram_type": "flowchart|block_diagram|network|hierarchy",
+    "direction": "DOWN|RIGHT|UP|LEFT"
+  },
+  "nodes": [
+    {
+      "id": "unique_id",
+      "type": "shape_type",
+      "text": "Label Text",
+      "hint": "position_hint",
+      "size_hint": "size_hint",
+      "style": {"fill_color": "FFFFFF", "line_color": "000000"}
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge_id",
+      "from": "source_node_id",
+      "to": "target_node_id",
+      "label": "optional label"
+    }
+  ]
+}
+
+AVAILABLE SHAPE TYPES:
+Basic: rectangle, rounded_rectangle, oval, diamond, hexagon, triangle, parallelogram
+Flowchart: process, decision, terminator, data, document, predefined_process
+Arrows: left_arrow, right_arrow, up_arrow, down_arrow
+Special: star, cloud, cylinder, database, gear
+
+POSITION HINTS (optional - layout engine uses these as guidance):
+- Absolute: "top", "bottom", "left", "right", "center", "top-left", "top-right", "bottom-left", "bottom-right"
+- Relative: "below:nodeId", "above:nodeId", "right-of:nodeId", "left-of:nodeId"
+- Alignment: "same-row:nodeId", "same-column:nodeId"
+
+SIZE HINTS (optional):
+- "small" (1.5" x 0.6")
+- "medium" (2.5" x 1.0") - default
+- "large" (3.5" x 1.5")
+- "wide" (4.0" x 1.0")
+- "tall" (2.0" x 2.0")
+
+PATENT CONVENTIONS:
+- Reference numbers: (100), (110), (120), (200), (210), etc.
+- Main components: 100-series
+- Sub-components: 110, 120, 130, etc.
+- Alternative systems: 200-series, 300-series
+- Format text as "Component Name\\n(Reference Number)"
+
+EXAMPLES:
+
+Example 1 - Flowchart:
+User: "Create a 3-step flowchart: input, processing, output"
+{
+  "metadata": {"title": "Process Flow", "diagram_type": "flowchart", "direction": "DOWN"},
+  "nodes": [
+    {"id": "step1", "type": "terminator", "text": "Input Data\\n(100)", "hint": "top", "style": {"fill_color": "E7E6E6"}},
+    {"id": "step2", "type": "process", "text": "Processing\\n(200)", "hint": "below:step1", "style": {"fill_color": "FFFFFF"}},
+    {"id": "step3", "type": "terminator", "text": "Output Result\\n(300)", "hint": "below:step2", "style": {"fill_color": "E7E6E6"}}
+  ],
+  "edges": [
+    {"id": "e1", "from": "step1", "to": "step2"},
+    {"id": "e2", "from": "step2", "to": "step3"}
+  ]
+}
+
+Example 2 - Decision Flowchart:
+User: "Flowchart with a decision: start, check condition, if yes do A, if no do B, then end"
+{
+  "metadata": {"title": "Decision Flow", "diagram_type": "flowchart", "direction": "DOWN"},
+  "nodes": [
+    {"id": "start", "type": "terminator", "text": "Start\\n(100)", "hint": "top", "style": {"fill_color": "90EE90"}},
+    {"id": "check", "type": "decision", "text": "Condition?\\n(110)", "hint": "below:start", "style": {"fill_color": "FFFACD"}},
+    {"id": "process_a", "type": "process", "text": "Process A\\n(120)", "hint": "below:check", "style": {"fill_color": "ADD8E6"}},
+    {"id": "process_b", "type": "process", "text": "Process B\\n(130)", "hint": "right-of:check", "style": {"fill_color": "FFB6C1"}},
+    {"id": "end", "type": "terminator", "text": "End\\n(200)", "hint": "below:process_a", "style": {"fill_color": "90EE90"}}
+  ],
+  "edges": [
+    {"id": "e1", "from": "start", "to": "check"},
+    {"id": "e2", "from": "check", "to": "process_a", "label": "Yes"},
+    {"id": "e3", "from": "check", "to": "process_b", "label": "No"},
+    {"id": "e4", "from": "process_a", "to": "end"},
+    {"id": "e5", "from": "process_b", "to": "end"}
+  ]
+}
+
+Example 3 - Block Diagram:
+User: "Server connected to database and three clients"
+{
+  "metadata": {"title": "System Architecture", "diagram_type": "block_diagram", "direction": "RIGHT"},
+  "nodes": [
+    {"id": "server", "type": "rectangle", "text": "Server\\n(100)", "hint": "center", "size_hint": "large", "style": {"fill_color": "4472C4"}},
+    {"id": "database", "type": "cylinder", "text": "Database\\n(110)", "hint": "right-of:server", "style": {"fill_color": "70AD47"}},
+    {"id": "client1", "type": "rounded_rectangle", "text": "Client 1\\n(200)", "hint": "left-of:server", "style": {"fill_color": "FFC000"}},
+    {"id": "client2", "type": "rounded_rectangle", "text": "Client 2\\n(210)", "hint": "below:client1", "style": {"fill_color": "FFC000"}},
+    {"id": "client3", "type": "rounded_rectangle", "text": "Client 3\\n(220)", "hint": "below:client2", "style": {"fill_color": "FFC000"}}
+  ],
+  "edges": [
+    {"id": "e1", "from": "server", "to": "database"},
+    {"id": "e2", "from": "client1", "to": "server"},
+    {"id": "e3", "from": "client2", "to": "server"},
+    {"id": "e4", "from": "client3", "to": "server"}
+  ]
+}
+
+CRITICAL RULES:
+1. Output ONLY valid JSON - no markdown, no explanations
+2. Include at least 2 nodes
+3. Every edge must reference valid node IDs
+4. Use position hints to describe RELATIONSHIPS, not coordinates
+5. For patent diagrams, always include reference numbers
+"""
+
+    # Legacy v1 System prompt (kept for backward compatibility)
     SYSTEM_PROMPT = """You are an expert AI assistant specialized in creating patent diagram specifications.
 
 Your task is to convert natural language descriptions into structured JSON specifications for PowerPoint diagrams.
@@ -390,7 +616,8 @@ CRITICAL JSON REQUIREMENTS:
 
             logger.info(f"Successfully generated spec with {len(validated_spec.elements)} elements")
 
-            return validated_spec.dict()
+            # Convert to dict, using aliases (by_alias=True ensures 'from' instead of 'from_id')
+            return validated_spec.model_dump(by_alias=True, exclude_none=True)
 
         except anthropic.APIError as e:
             logger.error(f"Anthropic API error: {e}")
@@ -401,6 +628,66 @@ CRITICAL JSON REQUIREMENTS:
             raise ValueError(f"Invalid JSON from Claude: {e}")
         except Exception as e:
             logger.error(f"Unexpected error generating diagram: {e}")
+            raise
+
+    def generate_diagram_spec_v2(self, prompt: str) -> Dict[str, Any]:
+        """
+        V2: Generate a diagram specification with nodes/edges (no coordinates).
+
+        The layout engine will calculate actual positions based on hints.
+        This is the NEW recommended method that produces better layouts.
+
+        Args:
+            prompt: User's diagram description
+
+        Returns:
+            Dictionary containing {metadata, nodes, edges} specification
+        """
+        logger.info(f"[V2] Generating diagram from prompt: {prompt[:100]}...")
+
+        try:
+            # Get Pydantic schema for V2 format
+            schema = DiagramSpecV2.model_json_schema()
+            transformed_schema = transform_schema(schema)
+
+            # Use V2 system prompt - generates structure with hints, not coordinates
+            response = self.client.beta.messages.create(
+                model=self.model,
+                max_tokens=self.max_tokens,
+                temperature=0.0,
+                betas=["structured-outputs-2025-11-13"],
+                system=self.SYSTEM_PROMPT_V2,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ],
+                output_format={
+                    "type": "json_schema",
+                    "schema": transformed_schema
+                }
+            )
+
+            response_text = response.content[0].text
+            logger.debug(f"Claude V2 response: {response_text[:300]}...")
+
+            spec = json.loads(response_text)
+            validated_spec = DiagramSpecV2(**spec)
+
+            logger.info(f"[V2] Successfully generated spec with {len(validated_spec.nodes)} nodes and {len(validated_spec.edges)} edges")
+
+            # Return with aliases (from_node -> from)
+            return validated_spec.model_dump(by_alias=True, exclude_none=True)
+
+        except anthropic.APIError as e:
+            logger.error(f"Anthropic API error: {e}")
+            raise
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse JSON from Claude V2 response: {e}")
+            raise ValueError(f"Invalid JSON from Claude: {e}")
+        except Exception as e:
+            logger.error(f"Unexpected error generating V2 diagram: {e}")
             raise
 
     def refine_diagram_spec(
@@ -460,7 +747,7 @@ CRITICAL JSON REQUIREMENTS:
 
             logger.info("Successfully refined diagram")
 
-            return validated_spec.dict()
+            return validated_spec.model_dump(by_alias=True, exclude_none=True)
 
         except Exception as e:
             logger.error(f"Error refining diagram: {e}")

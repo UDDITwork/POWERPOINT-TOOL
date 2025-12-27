@@ -41,10 +41,14 @@ class PPTXDiagramGenerator:
         # Basic Shapes
         'rectangle': MSO_SHAPE.RECTANGLE,
         'rounded_rectangle': MSO_SHAPE.ROUNDED_RECTANGLE,
+        'roundedrectangle': MSO_SHAPE.ROUNDED_RECTANGLE,  # Frontend camelCase
         'oval': MSO_SHAPE.OVAL,
         'circle': MSO_SHAPE.OVAL,
+        'square': MSO_SHAPE.RECTANGLE,  # Square is just a rectangle
         'diamond': MSO_SHAPE.DIAMOND,
         'triangle': MSO_SHAPE.ISOSCELES_TRIANGLE,
+        'triangledown': MSO_SHAPE.ISOSCELES_TRIANGLE,  # Will need rotation
+        'inverted_triangle': MSO_SHAPE.ISOSCELES_TRIANGLE,
         'right_triangle': MSO_SHAPE.RIGHT_TRIANGLE,
         'parallelogram': MSO_SHAPE.PARALLELOGRAM,
         'trapezoid': MSO_SHAPE.TRAPEZOID,
@@ -67,39 +71,89 @@ class PPTXDiagramGenerator:
         'flowchart_data': MSO_SHAPE.FLOWCHART_DATA,
         'document': MSO_SHAPE.FLOWCHART_DOCUMENT,
         'flowchart_document': MSO_SHAPE.FLOWCHART_DOCUMENT,
+        'multidocument': MSO_SHAPE.FLOWCHART_MULTIDOCUMENT,
         'predefined_process': MSO_SHAPE.FLOWCHART_PREDEFINED_PROCESS,
+        'predefinedprocess': MSO_SHAPE.FLOWCHART_PREDEFINED_PROCESS,
         'flowchart_preparation': MSO_SHAPE.FLOWCHART_PREPARATION,
+        'preparation': MSO_SHAPE.FLOWCHART_PREPARATION,
         'flowchart_manual_input': MSO_SHAPE.FLOWCHART_MANUAL_INPUT,
+        'manualinput': MSO_SHAPE.FLOWCHART_MANUAL_INPUT,
         'flowchart_manual_operation': MSO_SHAPE.FLOWCHART_MANUAL_OPERATION,
+        'manualoperation': MSO_SHAPE.FLOWCHART_MANUAL_OPERATION,
         'flowchart_connector': MSO_SHAPE.FLOWCHART_CONNECTOR,
         'flowchart_delay': MSO_SHAPE.FLOWCHART_DELAY,
+        'delay': MSO_SHAPE.FLOWCHART_DELAY,
         'flowchart_merge': MSO_SHAPE.FLOWCHART_MERGE,
+        'merge': MSO_SHAPE.FLOWCHART_MERGE,
+        'extract': MSO_SHAPE.FLOWCHART_EXTRACT,
         'flowchart_or': MSO_SHAPE.FLOWCHART_OR,
+        'or': MSO_SHAPE.FLOWCHART_OR,
+        'summing': MSO_SHAPE.FLOWCHART_SUMMING_JUNCTION,
         'flowchart_stored_data': MSO_SHAPE.FLOWCHART_STORED_DATA,
+        'storeddata': MSO_SHAPE.FLOWCHART_STORED_DATA,
+        'internalstorage': MSO_SHAPE.FLOWCHART_INTERNAL_STORAGE,
+        'offpageconnector': MSO_SHAPE.FLOWCHART_OFFPAGE_CONNECTOR,
 
         # Arrows
         'left_arrow': MSO_SHAPE.LEFT_ARROW,
+        'arrowleft': MSO_SHAPE.LEFT_ARROW,
         'right_arrow': MSO_SHAPE.RIGHT_ARROW,
+        'arrowright': MSO_SHAPE.RIGHT_ARROW,
         'up_arrow': MSO_SHAPE.UP_ARROW,
+        'arrowup': MSO_SHAPE.UP_ARROW,
         'down_arrow': MSO_SHAPE.DOWN_ARROW,
+        'arrowdown': MSO_SHAPE.DOWN_ARROW,
         'left_right_arrow': MSO_SHAPE.LEFT_RIGHT_ARROW,
+        'arrowbidirectional': MSO_SHAPE.LEFT_RIGHT_ARROW,
         'up_down_arrow': MSO_SHAPE.UP_DOWN_ARROW,
+        'arrowvertical': MSO_SHAPE.UP_DOWN_ARROW,
         'quad_arrow': MSO_SHAPE.QUAD_ARROW,
         'bent_arrow': MSO_SHAPE.BENT_ARROW,
+        'arrowbent': MSO_SHAPE.BENT_ARROW,
         'curved_right_arrow': MSO_SHAPE.CURVED_RIGHT_ARROW,
+        'arrowcurved': MSO_SHAPE.CURVED_RIGHT_ARROW,
         'curved_left_arrow': MSO_SHAPE.CURVED_LEFT_ARROW,
         'circular_arrow': MSO_SHAPE.CIRCULAR_ARROW,
+        'arrowcircular': MSO_SHAPE.CIRCULAR_ARROW,
+        'arrowuturn': MSO_SHAPE.U_TURN_ARROW,
+        'chevron': MSO_SHAPE.CHEVRON,
+        'chevronright': MSO_SHAPE.CHEVRON,
+        'chevronleft': MSO_SHAPE.CHEVRON,
+        'arrowpentagon': MSO_SHAPE.PENTAGON,
+        'arrownotched': MSO_SHAPE.NOTCHED_RIGHT_ARROW,
+        'arrowstriped': MSO_SHAPE.STRIPED_RIGHT_ARROW,
 
         # Callouts (for annotations)
         'callout': MSO_SHAPE.RECTANGULAR_CALLOUT,
         'rectangular_callout': MSO_SHAPE.RECTANGULAR_CALLOUT,
+        'calloutrect': MSO_SHAPE.RECTANGULAR_CALLOUT,
+        'rounded_rectangular_callout': MSO_SHAPE.ROUNDED_RECTANGULAR_CALLOUT,
+        'calloutrounded': MSO_SHAPE.ROUNDED_RECTANGULAR_CALLOUT,
         'rounded_callout': MSO_SHAPE.ROUNDED_RECTANGULAR_CALLOUT,
         'oval_callout': MSO_SHAPE.OVAL_CALLOUT,
+        'calloutoval': MSO_SHAPE.OVAL_CALLOUT,
         'cloud_callout': MSO_SHAPE.CLOUD_CALLOUT,
+        'calloutcloud': MSO_SHAPE.CLOUD_CALLOUT,
         'line_callout': MSO_SHAPE.LINE_CALLOUT_1,
+        'calloutline': MSO_SHAPE.LINE_CALLOUT_1,
+        'annotation': MSO_SHAPE.LINE_CALLOUT_1,
+        'bracket': MSO_SHAPE.LEFT_BRACKET,
+        'brace': MSO_SHAPE.LEFT_BRACE,
+
+        # Containers
+        'cylinder': MSO_SHAPE.CAN,
+        'database': MSO_SHAPE.CAN,
+        'can': MSO_SHAPE.CAN,
+        'folder': MSO_SHAPE.FOLDED_CORNER,  # No FOLDER in python-pptx, using folded corner
+        'card': MSO_SHAPE.FOLDED_CORNER,
+        'frame': MSO_SHAPE.FRAME,
+        'tape': MSO_SHAPE.FLOWCHART_PUNCHED_TAPE,
+        'cube': MSO_SHAPE.CUBE,
 
         # Stars
         'star_4': MSO_SHAPE.STAR_4_POINT,
+        'star4': MSO_SHAPE.STAR_4_POINT,
+        'star_4_point': MSO_SHAPE.STAR_4_POINT,
         'star_5': MSO_SHAPE.STAR_5_POINT,
         'star_6': MSO_SHAPE.STAR_6_POINT,
         'star_8': MSO_SHAPE.STAR_8_POINT,
@@ -113,7 +167,7 @@ class PPTXDiagramGenerator:
         'divide': MSO_SHAPE.MATH_DIVIDE,
         'equal': MSO_SHAPE.MATH_EQUAL,
 
-        # Special
+        # Special / Symbols
         'cloud': MSO_SHAPE.CLOUD,
         'lightning': MSO_SHAPE.LIGHTNING_BOLT,
         'sun': MSO_SHAPE.SUN,
@@ -121,6 +175,20 @@ class PPTXDiagramGenerator:
         'gear': MSO_SHAPE.GEAR_6,
         'smiley': MSO_SHAPE.SMILEY_FACE,
         'no_symbol': MSO_SHAPE.NO_SYMBOL,
+        'shield': MSO_SHAPE.FLOWCHART_DISPLAY,  # Closest match
+        'checkmark': MSO_SHAPE.RECTANGLE,  # Fallback
+        'xmark': MSO_SHAPE.RECTANGLE,  # Fallback
+        'warning': MSO_SHAPE.ISOSCELES_TRIANGLE,  # Warning triangle
+        'info': MSO_SHAPE.OVAL,  # Info circle
+        'flag': MSO_SHAPE.WAVE,  # Closest match
+        'puzzle': MSO_SHAPE.RECTANGLE,  # Fallback
+        'lock': MSO_SHAPE.RECTANGLE,  # Fallback
+        'key': MSO_SHAPE.RECTANGLE,  # Fallback
+
+        # Lines (rendered as thin rectangles or connectors)
+        'line': MSO_SHAPE.RECTANGLE,
+        'linearrow': MSO_SHAPE.RIGHT_ARROW,
+        'linedouble': MSO_SHAPE.LEFT_RIGHT_ARROW,
     }
 
     # Connector types
@@ -249,20 +317,56 @@ class PPTXDiagramGenerator:
         """Add a shape to the slide."""
         shape_type = element.get('type', 'rectangle')
 
-        # Get MSO_SHAPE constant
-        mso_shape = self.SHAPE_TYPE_MAP.get(shape_type.lower(), MSO_SHAPE.RECTANGLE)
+        # Get MSO_SHAPE constant - normalize shape name
+        shape_type_normalized = shape_type.lower().replace('_', '').replace('-', '')
+        mso_shape = self.SHAPE_TYPE_MAP.get(shape_type_normalized)
 
-        # Position and size
+        if mso_shape is None:
+            # Try original lowercase
+            mso_shape = self.SHAPE_TYPE_MAP.get(shape_type.lower())
+
+        if mso_shape is None:
+            logger.warning(f"Unknown shape type '{shape_type}', defaulting to rectangle")
+            mso_shape = MSO_SHAPE.RECTANGLE
+
+        # Position and size with validation
         pos = element.get('position', {'x': 1.0, 'y': 1.0})
         size = element.get('size', {'width': 2.0, 'height': 1.0})
 
-        shape = slide.shapes.add_shape(
-            mso_shape,
-            Inches(pos['x']),
-            Inches(pos['y']),
-            Inches(size['width']),
-            Inches(size['height'])
-        )
+        # Ensure position values are valid numbers
+        try:
+            x = float(pos.get('x', 1.0))
+            y = float(pos.get('y', 1.0))
+            width = float(size.get('width', 2.0))
+            height = float(size.get('height', 1.0))
+        except (TypeError, ValueError) as e:
+            logger.warning(f"Invalid position/size values for element, using defaults: {e}")
+            x, y, width, height = 1.0, 1.0, 2.0, 1.0
+
+        # Clamp to reasonable bounds
+        x = max(0.1, min(9.5, x))
+        y = max(0.1, min(7.0, y))
+        width = max(0.3, min(9.0, width))
+        height = max(0.3, min(6.5, height))
+
+        try:
+            shape = slide.shapes.add_shape(
+                mso_shape,
+                Inches(x),
+                Inches(y),
+                Inches(width),
+                Inches(height)
+            )
+        except Exception as e:
+            logger.error(f"Failed to add shape '{shape_type}': {e}")
+            # Fallback to rectangle
+            shape = slide.shapes.add_shape(
+                MSO_SHAPE.RECTANGLE,
+                Inches(x),
+                Inches(y),
+                Inches(width),
+                Inches(height)
+            )
 
         # Apply styling
         self._apply_shape_styling(shape, element)
@@ -311,21 +415,39 @@ class PPTXDiagramGenerator:
         """
         from_id = element.get('from')
         to_id = element.get('to')
+        connector_id = element.get('id', 'unknown')
 
         if not from_id or not to_id:
-            logger.warning(f"Connector missing from/to references: {element}")
+            logger.error(f"Connector '{connector_id}' missing from/to references: {element}")
+            # Don't fail silently - log error but continue to render other elements
             return None
 
         from_shape = self.shape_registry.get(from_id)
         to_shape = self.shape_registry.get(to_id)
 
-        if not from_shape or not to_shape:
-            logger.warning(f"Connector references unknown shapes: {from_id}, {to_id}")
+        missing_shapes = []
+        if not from_shape:
+            missing_shapes.append(f"source '{from_id}'")
+        if not to_shape:
+            missing_shapes.append(f"target '{to_id}'")
+
+        if missing_shapes:
+            # Log detailed error for debugging
+            logger.error(f"Connector '{connector_id}' references non-existent shape(s): {', '.join(missing_shapes)}")
+            logger.error(f"Available shapes in registry: {list(self.shape_registry.keys())}")
+            # Return None to skip this connector but continue rendering
             return None
 
+        # Auto-detect optimal connection sides based on shape positions
+        from_side = element.get('from_side')
+        to_side = element.get('to_side')
+
+        if not from_side or not to_side:
+            from_side, to_side = self._calculate_optimal_connection_sides(from_shape, to_shape)
+
         # Calculate connection points
-        from_point = self._get_connection_point(from_shape, element.get('from_side', 'bottom'))
-        to_point = self._get_connection_point(to_shape, element.get('to_side', 'top'))
+        from_point = self._get_connection_point(from_shape, from_side)
+        to_point = self._get_connection_point(to_shape, to_side)
 
         # Connector type
         connector_type_str = element.get('connector_type', 'straight')
@@ -342,6 +464,41 @@ class PPTXDiagramGenerator:
         self._apply_connector_styling(connector, element)
 
         return connector
+
+    def _calculate_optimal_connection_sides(self, from_shape, to_shape) -> Tuple[str, str]:
+        """
+        Calculate optimal connection sides based on relative positions of shapes.
+
+        Returns:
+            Tuple of (from_side, to_side)
+        """
+        # Get shape centers
+        from_cx = from_shape.left + from_shape.width // 2
+        from_cy = from_shape.top + from_shape.height // 2
+        to_cx = to_shape.left + to_shape.width // 2
+        to_cy = to_shape.top + to_shape.height // 2
+
+        # Calculate relative position
+        dx = to_cx - from_cx
+        dy = to_cy - from_cy
+
+        # Determine primary direction
+        if abs(dy) > abs(dx):
+            # Vertical arrangement
+            if dy > 0:
+                # Target is below source
+                return 'bottom', 'top'
+            else:
+                # Target is above source
+                return 'top', 'bottom'
+        else:
+            # Horizontal arrangement
+            if dx > 0:
+                # Target is to the right
+                return 'right', 'left'
+            else:
+                # Target is to the left
+                return 'left', 'right'
 
     def _add_table(self, slide, element: Dict[str, Any]) -> Any:
         """Add a table to the slide."""
@@ -429,27 +586,36 @@ class PPTXDiagramGenerator:
         return picture
 
     def _apply_shape_styling(self, shape, element: Dict[str, Any]) -> None:
-        """Apply fill, line, and other styling to a shape."""
+        """Apply fill, line, and other styling to a shape.
+
+        For patent diagrams, default is:
+        - Transparent fill (no fill)
+        - Black border (1pt)
+        - Solid line style
+        """
         style = element.get('style', {})
 
-        # Fill color
-        if 'fill_color' in style:
+        # Fill color - default to NO FILL (transparent) for patent diagrams
+        if 'fill_color' in style and style['fill_color']:
             fill_color = style['fill_color']
             shape.fill.solid()
             if isinstance(fill_color, str):
                 rgb = self._hex_to_rgb(fill_color)
                 shape.fill.fore_color.rgb = RGBColor(*rgb)
+        else:
+            # No fill = transparent background
+            shape.fill.background()
 
-        # Line color and width
-        if 'line_color' in style:
-            line_color = style['line_color']
-            rgb = self._hex_to_rgb(line_color)
-            shape.line.color.rgb = RGBColor(*rgb)
+        # Line color - default to BLACK
+        line_color = style.get('line_color', '000000')
+        rgb = self._hex_to_rgb(line_color)
+        shape.line.color.rgb = RGBColor(*rgb)
 
-        if 'line_width' in style:
-            shape.line.width = Pt(style['line_width'])
+        # Line width - default to 1pt
+        line_width = style.get('line_width', 1.0)
+        shape.line.width = Pt(line_width)
 
-        # Line style (dashed, dotted, etc.)
+        # Line style (dashed, dotted, etc.) - default to solid
         if 'line_style' in style:
             line_style_map = {
                 'solid': MSO_LINE_DASH_STYLE.SOLID,
@@ -464,7 +630,13 @@ class PPTXDiagramGenerator:
             shape.rotation = style['rotation']
 
     def _apply_connector_styling(self, connector, element: Dict[str, Any]) -> None:
-        """Apply styling to connectors (arrows, line styles, etc.)."""
+        """Apply styling to connectors (arrows, line styles, etc.).
+
+        For patent diagrams, default is:
+        - Black line color
+        - 1pt line width
+        - Arrow at end
+        """
         style = element.get('style', {})
 
         # Arrow style
@@ -474,16 +646,16 @@ class PPTXDiagramGenerator:
         if style.get('arrow_end', True):  # Default: arrow at end
             connector.line.end_arrow_type = 1  # Arrow at end
 
-        # Line color
-        if 'line_color' in style:
-            rgb = self._hex_to_rgb(style['line_color'])
-            connector.line.color.rgb = RGBColor(*rgb)
+        # Line color - default to BLACK
+        line_color = style.get('line_color', '000000')
+        rgb = self._hex_to_rgb(line_color)
+        connector.line.color.rgb = RGBColor(*rgb)
 
-        # Line width
-        if 'line_width' in style:
-            connector.line.width = Pt(style['line_width'])
+        # Line width - default to 1pt
+        line_width = style.get('line_width', 1.0)
+        connector.line.width = Pt(line_width)
 
-        # Line style
+        # Line style - default to solid
         if 'line_style' in style:
             line_style_map = {
                 'solid': MSO_LINE_DASH_STYLE.SOLID,
@@ -494,7 +666,12 @@ class PPTXDiagramGenerator:
             connector.line.dash_style = line_style_map.get(style['line_style'], MSO_LINE_DASH_STYLE.SOLID)
 
     def _add_text_to_shape(self, shape, element: Dict[str, Any]) -> None:
-        """Add and format text within a shape."""
+        """Add and format text within a shape.
+
+        For patent diagrams, default is:
+        - Black text color
+        - Center aligned
+        """
         text = element.get('text', '')
         text_frame = shape.text_frame
         text_frame.clear()  # Remove default paragraph
@@ -517,28 +694,29 @@ class PPTXDiagramGenerator:
         if 'italic' in text_config:
             paragraph.font.italic = text_config['italic']
 
-        if 'color' in text_config:
-            rgb = self._hex_to_rgb(text_config['color'])
-            paragraph.font.color.rgb = RGBColor(*rgb)
+        # Text color - default to BLACK
+        text_color = text_config.get('color', '000000')
+        rgb = self._hex_to_rgb(text_color)
+        paragraph.font.color.rgb = RGBColor(*rgb)
 
-        # Text alignment
-        if 'align' in text_config:
-            align_map = {
-                'left': PP_ALIGN.LEFT,
-                'center': PP_ALIGN.CENTER,
-                'right': PP_ALIGN.RIGHT,
-                'justify': PP_ALIGN.JUSTIFY,
-            }
-            paragraph.alignment = align_map.get(text_config['align'], PP_ALIGN.CENTER)
+        # Text alignment - default to CENTER
+        align_map = {
+            'left': PP_ALIGN.LEFT,
+            'center': PP_ALIGN.CENTER,
+            'right': PP_ALIGN.RIGHT,
+            'justify': PP_ALIGN.JUSTIFY,
+        }
+        text_align = text_config.get('align', 'center')
+        paragraph.alignment = align_map.get(text_align, PP_ALIGN.CENTER)
 
-        # Vertical alignment
-        if 'vertical_align' in text_config:
-            valign_map = {
-                'top': MSO_ANCHOR.TOP,
-                'middle': MSO_ANCHOR.MIDDLE,
-                'bottom': MSO_ANCHOR.BOTTOM,
-            }
-            text_frame.vertical_anchor = valign_map.get(text_config['vertical_align'], MSO_ANCHOR.MIDDLE)
+        # Vertical alignment - default to MIDDLE
+        valign_map = {
+            'top': MSO_ANCHOR.TOP,
+            'middle': MSO_ANCHOR.MIDDLE,
+            'bottom': MSO_ANCHOR.BOTTOM,
+        }
+        vertical_align = text_config.get('vertical_align', 'middle')
+        text_frame.vertical_anchor = valign_map.get(vertical_align, MSO_ANCHOR.MIDDLE)
 
     def _apply_text_formatting(self, text_frame, element: Dict[str, Any]) -> None:
         """Apply text formatting to a text frame."""

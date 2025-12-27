@@ -95,6 +95,18 @@ class DiagramStatusResponse(BaseModel):
     error: Optional[str] = None
     created_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
+    spec: Optional[Dict[str, Any]] = Field(
+        None,
+        description="The diagram specification (returned when job is completed)"
+    )
+    element_count: Optional[int] = Field(
+        None,
+        description="Number of elements in the diagram"
+    )
+    diagram_type: Optional[str] = Field(
+        None,
+        description="Type of diagram generated"
+    )
 
     class Config:
         schema_extra = {
@@ -105,7 +117,9 @@ class DiagramStatusResponse(BaseModel):
                 "message": "Diagram ready for download",
                 "progress": 100,
                 "download_url": "/api/diagram/download/550e8400-e29b-41d4-a716-446655440000.pptx",
-                "preview_url": "/api/diagram/preview/550e8400-e29b-41d4-a716-446655440000.png"
+                "preview_url": "/api/diagram/preview/550e8400-e29b-41d4-a716-446655440000.png",
+                "element_count": 5,
+                "diagram_type": "flowchart"
             }
         }
 
