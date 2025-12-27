@@ -134,7 +134,7 @@ const shapeCategories = [
   },
 ];
 
-const Sidebar = ({ onAIClick }) => {
+const Sidebar = () => {
   const [expandedCategories, setExpandedCategories] = useState(
     shapeCategories.reduce((acc, cat) => {
       acc[cat.name] = cat.expanded;
@@ -195,15 +195,6 @@ const Sidebar = ({ onAIClick }) => {
             )}
           </div>
         ))}
-
-        <div className="sidebar-section ai-section">
-          <h3 className="sidebar-title">AI Generate</h3>
-          <button className="ai-button" onClick={onAIClick}>
-            <span className="ai-icon">✨</span>
-            Generate with AI
-          </button>
-          <p className="ai-hint">Describe your diagram and let AI create it</p>
-        </div>
 
         <div className="sidebar-section">
           <h3 className="sidebar-title">Tips</h3>

@@ -13,7 +13,7 @@ import 'reactflow/dist/style.css';
 import ShapeNode from '../nodes/ShapeNode';
 import Sidebar from './Sidebar';
 import Toolbar from './Toolbar';
-import AIModal from './AIModal';
+import AIPromptPanel from './AIPromptPanel';
 import './DiagramBuilder.css';
 
 import axios from 'axios';
@@ -43,10 +43,10 @@ const DiagramBuilder = () => {
   const [selectedNode, setSelectedNode] = useState(null);
   const [history, setHistory] = useState([{ nodes: [], edges: [] }]);
   const [historyIndex, setHistoryIndex] = useState(0);
-  const [isAIModalOpen, setIsAIModalOpen] = useState(false);
   const [aiLoading, setAILoading] = useState(false);
   const [aiProgress, setAIProgress] = useState(0);
   const [aiLogs, setAILogs] = useState([]);
+  const [sessionId, setSessionId] = useState(null);
 
   const reactFlowWrapper = useRef(null);
   const [reactFlowInstance, setReactFlowInstance] = useState(null);
@@ -396,22 +396,26 @@ const DiagramBuilder = () => {
     }
   }, [handleLabelChange, saveToHistory]);
 
-  // AI Generation
+  // AI Generation using Opus v3 endpoint with extended thinking
   const handleAIGenerate = useCallback(async (prompt) => {
     setAILoading(true);
     setAIProgress(0);
     setAILogs([]);
 
     try {
-      // Call backend to generate diagram
-      const response = await axios.post(`${API_URL}/api/diagram/create`, {
+      setAILogs((prev) => [...prev, 'Starting AI generation with extended thinking...']);
+
+      // Call backend v3 endpoint (Opus with extended thinking)
+      const response = await axios.post(`${API_URL}/api/diagram/create-v3`, {
         prompt: prompt,
-        quality: 'high',
-        output_format: 'json', // Request JSON instead of PPTX
+        thinking_budget: 16000,
+        validate: true,
       });
 
       const jobId = response.data.job_id;
-      setAILogs((prev) => [...prev, `Job started: ${jobId}`]);
+      const newSessionId = response.data.session_id;
+      setSessionId(newSessionId);
+      setAILogs((prev) => [...prev, `Job started: ${jobId.slice(0, 8)}...`]);
 
       // Poll for status
       const pollInterval = setInterval(async () => {
@@ -420,7 +424,15 @@ const DiagramBuilder = () => {
           const status = statusResponse.data;
 
           setAIProgress(status.progress || 0);
-          setAILogs((prev) => [...prev, status.message || 'Processing...']);
+          if (status.message) {
+            setAILogs((prev) => {
+              // Avoid duplicate messages
+              if (prev[prev.length - 1] !== status.message) {
+                return [...prev, status.message];
+              }
+              return prev;
+            });
+          }
 
           if (status.status === 'completed') {
             clearInterval(pollInterval);
@@ -428,26 +440,97 @@ const DiagramBuilder = () => {
             // Get the diagram spec
             if (status.spec) {
               convertSpecToNodes(status.spec);
+              setAILogs((prev) => [...prev, '✅ Diagram generated successfully!']);
             }
 
             setAILoading(false);
-            setIsAIModalOpen(false);
           } else if (status.status === 'failed') {
             clearInterval(pollInterval);
-            setAILogs((prev) => [...prev, `Error: ${status.error}`]);
+            setAILogs((prev) => [...prev, `❌ Error: ${status.error}`]);
             setAILoading(false);
           }
         } catch (err) {
           clearInterval(pollInterval);
-          setAILogs((prev) => [...prev, `Error: ${err.message}`]);
+          setAILogs((prev) => [...prev, `❌ Error: ${err.message}`]);
           setAILoading(false);
         }
       }, 2000);
     } catch (err) {
-      setAILogs((prev) => [...prev, `Error: ${err.message}`]);
+      setAILogs((prev) => [...prev, `❌ Error: ${err.message}`]);
       setAILoading(false);
     }
   }, []);
+
+  // AI Refinement - refine existing diagram based on feedback
+  const handleAIRefine = useCallback(async (refinementPrompt) => {
+    if (nodes.length === 0) {
+      setAILogs((prev) => [...prev, '⚠️ No diagram to refine. Generate one first.']);
+      return;
+    }
+
+    setAILoading(true);
+    setAIProgress(0);
+    setAILogs([]);
+
+    try {
+      setAILogs((prev) => [...prev, 'Analyzing refinement request...']);
+
+      // If we have a session, use feedback endpoint; otherwise create new
+      if (sessionId) {
+        const response = await axios.post(`${API_URL}/api/feedback/submit`, {
+          session_id: sessionId,
+          feedback_text: refinementPrompt,
+        });
+
+        if (response.data.refinement_job_id) {
+          const jobId = response.data.refinement_job_id;
+          setAILogs((prev) => [...prev, `Refinement job: ${jobId.slice(0, 8)}...`]);
+
+          // Poll for status
+          const pollInterval = setInterval(async () => {
+            try {
+              const statusResponse = await axios.get(`${API_URL}/api/diagram/status/${jobId}`);
+              const status = statusResponse.data;
+
+              setAIProgress(status.progress || 0);
+              if (status.message) {
+                setAILogs((prev) => {
+                  if (prev[prev.length - 1] !== status.message) {
+                    return [...prev, status.message];
+                  }
+                  return prev;
+                });
+              }
+
+              if (status.status === 'completed') {
+                clearInterval(pollInterval);
+                if (status.spec) {
+                  convertSpecToNodes(status.spec);
+                  setAILogs((prev) => [...prev, '✅ Diagram refined successfully!']);
+                }
+                setAILoading(false);
+              } else if (status.status === 'failed') {
+                clearInterval(pollInterval);
+                setAILogs((prev) => [...prev, `❌ Error: ${status.error}`]);
+                setAILoading(false);
+              }
+            } catch (err) {
+              clearInterval(pollInterval);
+              setAILogs((prev) => [...prev, `❌ Error: ${err.message}`]);
+              setAILoading(false);
+            }
+          }, 2000);
+        }
+      } else {
+        // No session - generate new diagram with the refinement as prompt
+        setAILogs((prev) => [...prev, 'No active session. Creating new diagram...']);
+        await handleAIGenerate(refinementPrompt);
+      }
+    } catch (err) {
+      setAILogs((prev) => [...prev, `❌ Error: ${err.message}`]);
+      setAILoading(false);
+    }
+  }, [nodes.length, sessionId, handleAIGenerate]);
 
   // Convert AI spec (V1 format from backend) to React Flow nodes
   // V1 format has elements array with both shapes and connectors
@@ -607,6 +690,12 @@ const DiagramBuilder = () => {
     return nodes.find((n) => n.id === selectedNode.id) || null;
   }, [nodes, selectedNode]);
 
+  // Diagram info for the prompt panel
+  const currentDiagramInfo = useMemo(() => ({
+    nodeCount: nodes.length,
+    edgeCount: edges.length,
+  }), [nodes.length, edges.length]);
+
   return (
     <div className="diagram-builder" onKeyDown={handleKeyDown} tabIndex={0}>
       <Toolbar
@@ -623,7 +712,7 @@ const DiagramBuilder = () => {
       />
 
       <div className="diagram-content">
-        <Sidebar onAIClick={() => setIsAIModalOpen(true)} />
+        <Sidebar />
 
         <div className="canvas-wrapper" ref={reactFlowWrapper}>
           <ReactFlow
@@ -652,16 +741,17 @@ const DiagramBuilder = () => {
             />
           </ReactFlow>
         </div>
-      </div>
 
-      <AIModal
-        isOpen={isAIModalOpen}
-        onClose={() => setIsAIModalOpen(false)}
-        onGenerate={handleAIGenerate}
-        isLoading={aiLoading}
-        progress={aiProgress}
-        logs={aiLogs}
-      />
+        <AIPromptPanel
+          onGenerate={handleAIGenerate}
+          onRefine={handleAIRefine}
+          isLoading={aiLoading}
+          progress={aiProgress}
+          logs={aiLogs}
+          hasDiagram={nodes.length > 0}
+          currentDiagramInfo={currentDiagramInfo}
+        />
+      </div>
     </div>
   );
 };

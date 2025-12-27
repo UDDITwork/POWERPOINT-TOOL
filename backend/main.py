@@ -23,6 +23,7 @@ from datetime import datetime
 
 # Import our modules
 from ai.claude_agent import ClaudeDiagramAgent
+from ai.opus_diagram_agent import OpusDiagramAgent
 from diagram_engine.pptx_generator import PPTXDiagramGenerator
 from diagram_engine.elk_layout import ELKLayoutEngine, apply_elk_layout
 from validation_agent import DiagramValidator, ValidationLoop, validate_diagram
@@ -34,6 +35,7 @@ from models.schemas import (
     DiagramStatusResponse,
     JobStatus
 )
+from config import DIAGRAM_CONFIG, THINKING_CONFIG, get_thinking_budget_for_complexity
 
 # Configure logging
 logging.basicConfig(
@@ -76,17 +78,26 @@ STORAGE_PATH.mkdir(parents=True, exist_ok=True)
 PREVIEW_PATH = STORAGE_PATH / "previews"
 PREVIEW_PATH.mkdir(parents=True, exist_ok=True)
 
-# Initialize AI agent
+# Initialize AI agents
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 if not ANTHROPIC_API_KEY:
     logger.warning("ANTHROPIC_API_KEY not set! AI features will not work.")
     claude_agent = None
+    opus_agent = None
 else:
+    # Standard Claude agent (Sonnet - fast, cheaper)
     claude_agent = ClaudeDiagramAgent(
         api_key=ANTHROPIC_API_KEY,
         model=os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-5"),
         max_tokens=int(os.getenv("ANTHROPIC_MAX_TOKENS", "16000"))
     )
+    # Premium Opus agent (extended thinking - better quality)
+    opus_agent = OpusDiagramAgent(
+        api_key=ANTHROPIC_API_KEY,
+        thinking_budget=THINKING_CONFIG["budget_tokens"],
+        max_tokens=int(os.getenv("ANTHROPIC_MAX_TOKENS", "16000"))
+    )
+    logger.info(f"Initialized Opus agent with thinking_budget={THINKING_CONFIG['budget_tokens']}")
 
 # In-memory job tracking (use Redis in production)
 job_store: Dict[str, Dict[str, Any]] = {}
@@ -220,6 +231,80 @@ async def refine_diagram(request: DiagramRefineRequest, background_tasks: Backgr
         session_id=request.session_id,
         status=JobStatus.QUEUED,
         message="Diagram refinement queued"
+    )
+
+
+class DiagramCreateRequestV3(BaseModel):
+    """Request model for v3 diagram creation with Opus extended thinking."""
+    prompt: str = Field(..., description="Natural language description of the diagram")
+    session_id: Optional[str] = Field(None, description="Session ID for conversation tracking")
+    thinking_budget: Optional[int] = Field(None, description="Custom thinking budget (tokens)")
+    validate: bool = Field(True, description="Enable self-validation loop")
+    options: Optional[Dict[str, Any]] = Field(None, description="Additional generation options")
+
+
+@app.post("/api/diagram/create-v3", response_model=DiagramStatusResponse)
+async def create_diagram_v3(request: DiagramCreateRequestV3, background_tasks: BackgroundTasks):
+    """
+    Create a diagram using Claude Opus 4.5 with Extended Thinking.
+
+    This premium endpoint uses multi-step reasoning for higher quality diagrams:
+    1. Extended thinking for spatial planning
+    2. Self-validation before output
+    3. Better handling of complex layouts
+
+    Best for:
+    - Complex diagrams (10+ nodes)
+    - Diagrams with many connections
+    - When layout quality is critical
+
+    Args:
+        request: Diagram creation request with prompt and options
+
+    Returns:
+        Job status with job_id for tracking
+    """
+    if not opus_agent:
+        raise HTTPException(status_code=503, detail="Opus AI service not configured")
+
+    # Generate unique job ID
+    job_id = str(uuid.uuid4())
+    session_id = request.session_id or job_id
+
+    logger.info(f"[V3] Creating diagram job {job_id} with Opus extended thinking")
+
+    # Determine thinking budget
+    thinking_budget = request.thinking_budget or THINKING_CONFIG["budget_tokens"]
+
+    # Initialize job in store
+    job_store[job_id] = {
+        "job_id": job_id,
+        "session_id": session_id,
+        "status": "queued",
+        "prompt": request.prompt,
+        "created_at": datetime.utcnow().isoformat(),
+        "progress": 0,
+        "type": "opus_v3",
+        "thinking_budget": thinking_budget,
+        "validate": request.validate
+    }
+
+    # Queue the diagram generation task
+    background_tasks.add_task(
+        generate_diagram_opus_sync,
+        job_id=job_id,
+        prompt=request.prompt,
+        session_id=session_id,
+        thinking_budget=thinking_budget,
+        validate=request.validate,
+        options=request.options
+    )
+
+    return DiagramStatusResponse(
+        job_id=job_id,
+        session_id=session_id,
+        status=JobStatus.QUEUED,
+        message="Diagram generation with Opus extended thinking queued"
     )
 
 
@@ -851,6 +936,149 @@ def generate_diagram_sync(
         job_store[job_id]["status"] = "failed"
         job_store[job_id]["error"] = f"{type(e).__name__}: {str(e)}"
         job_store[job_id]["message"] = "Diagram generation failed"
+
+
+def generate_diagram_opus_sync(
+    job_id: str,
+    prompt: str,
+    session_id: str,
+    thinking_budget: int = 16000,
+    validate: bool = True,
+    options: Optional[Dict[str, Any]] = None
+):
+    """
+    V3 Diagram generation using Claude Opus 4.5 with Extended Thinking.
+
+    This premium pipeline uses multi-step reasoning for better diagram quality:
+    1. Opus generates with extended thinking (UNDERSTAND -> PLAN -> VALIDATE -> GENERATE)
+    2. Self-validation loop catches issues before output
+    3. ELK Layout Engine calculates positions with collision detection
+    4. Validation loop checks for overlaps and missing connections
+    5. PPTX generator creates the final PowerPoint file
+
+    Args:
+        job_id: Job identifier
+        prompt: User's diagram prompt
+        session_id: Session identifier
+        thinking_budget: Token budget for extended thinking
+        validate: Enable self-validation
+        options: Optional generation options
+    """
+    try:
+        logger.info(f"[OPUS JOB {job_id}] Starting V3 Opus diagram generation")
+        logger.info(f"[OPUS JOB {job_id}] Prompt: {prompt[:200]}...")
+        logger.info(f"[OPUS JOB {job_id}] Thinking budget: {thinking_budget}")
+
+        # Initialize conversation memory for this session
+        memory = memory_manager.get_or_create(session_id)
+        memory.add_user_message(content=prompt)
+
+        # Update status
+        job_store[job_id]["status"] = "processing"
+        job_store[job_id]["message"] = "Claude Opus is thinking through the diagram layout..."
+        job_store[job_id]["progress"] = 10
+
+        # Step 1: Generate with Opus extended thinking
+        logger.info(f"[OPUS JOB {job_id}] Calling Claude Opus with extended thinking...")
+
+        result = opus_agent.generate_with_validation(
+            prompt=prompt,
+            max_attempts=2 if validate else 1,
+            validate=validate
+        )
+
+        v2_spec = result["spec"]
+        thinking_summary = result.get("thinking_summary", [])
+        tokens_used = result.get("tokens_used", {})
+        validation_info = result.get("validation_info", {})
+
+        logger.info(f"[OPUS JOB {job_id}] Opus response: {len(v2_spec.get('nodes', []))} nodes, {len(v2_spec.get('edges', []))} edges")
+        logger.info(f"[OPUS JOB {job_id}] Thinking blocks: {len(thinking_summary)}")
+        logger.info(f"[OPUS JOB {job_id}] Tokens used: input={tokens_used.get('input', 0)}, output={tokens_used.get('output', 0)}")
+
+        if validation_info.get("attempts", 1) > 1:
+            logger.info(f"[OPUS JOB {job_id}] Self-validation: {validation_info.get('attempts')} attempts, passed={validation_info.get('passed', False)}")
+
+        job_store[job_id]["v2_spec"] = v2_spec
+        job_store[job_id]["thinking_summary"] = thinking_summary
+        job_store[job_id]["tokens_used"] = tokens_used
+        job_store[job_id]["validation_info"] = validation_info
+        job_store[job_id]["progress"] = 40
+        job_store[job_id]["message"] = "Calculating optimal layout with collision detection..."
+
+        # Step 2: Apply ELK layout with validation loop
+        logger.info(f"[OPUS JOB {job_id}] Running ELK layout engine...")
+        layout_engine = ELKLayoutEngine()
+        validator = DiagramValidator()
+        validation_loop = ValidationLoop(layout_engine, validator)
+
+        # Run layout with validation (up to 3 attempts)
+        v1_spec, validation_issues = validation_loop.generate_with_validation(v2_spec)
+
+        # Log validation results
+        errors = [i for i in validation_issues if i.severity == 'error']
+        warnings = [i for i in validation_issues if i.severity == 'warning']
+        logger.info(f"[OPUS JOB {job_id}] Layout complete: {len(errors)} errors, {len(warnings)} warnings")
+
+        if errors:
+            logger.warning(f"[OPUS JOB {job_id}] Validation errors: {[e.message for e in errors]}")
+
+        job_store[job_id]["diagram_spec"] = v1_spec
+        job_store[job_id]["validation_issues"] = [
+            {"type": i.issue_type, "severity": i.severity, "message": i.message}
+            for i in validation_issues
+        ]
+        job_store[job_id]["progress"] = 70
+        job_store[job_id]["message"] = "Building PowerPoint diagram..."
+
+        # Step 3: Generate PPTX with python-pptx
+        logger.info(f"[OPUS JOB {job_id}] Generating PPTX with {len(v1_spec.get('elements', []))} elements...")
+        generator = PPTXDiagramGenerator()
+        generator.create_from_json(v1_spec)
+
+        # Save file
+        output_path = STORAGE_PATH / f"{job_id}.pptx"
+        generator.save(str(output_path))
+        logger.info(f"[OPUS JOB {job_id}] PPTX saved to {output_path}")
+
+        job_store[job_id]["progress"] = 90
+        job_store[job_id]["message"] = "Finalizing..."
+
+        # Step 4: Store in conversation memory for feedback loop
+        memory.add_diagram_version(
+            version_id=job_id,
+            v2_spec=v2_spec,
+            v1_spec=v1_spec,
+            validation_issues=[
+                {"type": i.issue_type, "severity": i.severity, "message": i.message}
+                for i in validation_issues
+            ],
+            prompt=prompt,
+            is_refinement=False
+        )
+
+        memory.add_assistant_message(
+            content=f"Generated diagram with {len(v2_spec.get('nodes', []))} nodes and {len(v2_spec.get('edges', []))} edges using Opus extended thinking.",
+            metadata={"job_id": job_id, "thinking_blocks": len(thinking_summary)}
+        )
+
+        # Mark as completed
+        job_store[job_id]["status"] = "completed"
+        job_store[job_id]["progress"] = 100
+        job_store[job_id]["message"] = "Premium diagram ready for download"
+        job_store[job_id]["file_path"] = str(output_path)
+        job_store[job_id]["completed_at"] = datetime.utcnow().isoformat()
+
+        logger.info(f"[OPUS JOB {job_id}] ✅ V3 Opus diagram generation completed successfully")
+
+    except Exception as e:
+        logger.error(f"[OPUS JOB {job_id}] ❌ Error generating diagram: {e}", exc_info=True)
+        logger.error(f"[OPUS JOB {job_id}] Error type: {type(e).__name__}")
+        logger.error(f"[OPUS JOB {job_id}] Error details: {str(e)}")
+
+        job_store[job_id]["status"] = "failed"
+        job_store[job_id]["error"] = f"{type(e).__name__}: {str(e)}"
+        job_store[job_id]["message"] = "Opus diagram generation failed"
 
 
 def export_pptx_sync(job_id: str, spec: Dict[str, Any]):
