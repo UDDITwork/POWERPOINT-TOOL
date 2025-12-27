@@ -346,23 +346,16 @@ CRITICAL JSON REQUIREMENTS:
         logger.info(f"Generating diagram from prompt: {prompt[:100]}...")
 
         try:
-            # Get schema and add additionalProperties: false
+            # Use Anthropic's transform_schema helper to prepare schema
+            from anthropic import transform_schema
+
+            # Get Pydantic schema
             schema = DiagramSpec.model_json_schema()
 
-            # Ensure additionalProperties: false for all objects (required by Anthropic)
-            def add_no_additional_properties(obj):
-                if isinstance(obj, dict):
-                    if obj.get("type") == "object":
-                        obj["additionalProperties"] = False
-                    for value in obj.values():
-                        add_no_additional_properties(value)
-                elif isinstance(obj, list):
-                    for item in obj:
-                        add_no_additional_properties(item)
+            # Transform schema for structured outputs (adds additionalProperties: false recursively)
+            transformed_schema = transform_schema(schema)
 
-            add_no_additional_properties(schema)
-
-            # Use beta.messages.create with betas parameter (NOT extra_headers)
+            # Use beta.messages.create with betas parameter (per official docs)
             response = self.client.beta.messages.create(
                 model=self.model,
                 max_tokens=self.max_tokens,
@@ -377,7 +370,7 @@ CRITICAL JSON REQUIREMENTS:
                 ],
                 output_format={
                     "type": "json_schema",
-                    "schema": schema  # Schema with additionalProperties: false
+                    "schema": transformed_schema  # SDK-transformed schema
                 }
             )
 
@@ -431,21 +424,12 @@ CRITICAL JSON REQUIREMENTS:
         )
 
         try:
-            # Get schema and add additionalProperties: false
+            # Use Anthropic's transform_schema helper
+            from anthropic import transform_schema
+
+            # Get Pydantic schema and transform it
             schema = DiagramSpec.model_json_schema()
-
-            # Ensure additionalProperties: false for all objects
-            def add_no_additional_properties(obj):
-                if isinstance(obj, dict):
-                    if obj.get("type") == "object":
-                        obj["additionalProperties"] = False
-                    for value in obj.values():
-                        add_no_additional_properties(value)
-                elif isinstance(obj, list):
-                    for item in obj:
-                        add_no_additional_properties(item)
-
-            add_no_additional_properties(schema)
+            transformed_schema = transform_schema(schema)
 
             # Use beta.messages.create with betas parameter
             response = self.client.beta.messages.create(
@@ -462,7 +446,7 @@ CRITICAL JSON REQUIREMENTS:
                 ],
                 output_format={
                     "type": "json_schema",
-                    "schema": schema  # Schema with additionalProperties: false
+                    "schema": transformed_schema  # SDK-transformed schema
                 }
             )
 
