@@ -74,16 +74,7 @@ function App() {
           <textarea
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
-            placeholder={"Describe your diagram... 
-
-Example:
-Create a computer system with:
-- Computer System (100) containing:
-  - Processor (110)
-  - Memory (120) containing:
-    - Cache (122)
-    - RAM (124)
-  - Storage (130)"}
+            placeholder="Describe your diagram...&#10;&#10;Example:&#10;Create a computer system with:&#10;- Computer System (100) containing:&#10;  - Processor (110)&#10;  - Memory (120) containing:&#10;    - Cache (122)&#10;    - RAM (124)&#10;  - Storage (130)"
             rows={12}
             disabled={loading}
           />
