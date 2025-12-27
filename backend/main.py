@@ -90,7 +90,7 @@ async def root():
     return {
         "status": "online",
         "service": "AI Patent Diagram Generator",
-        "version": "1.0.0",
+        "version": "1.0.1",  # Updated to trigger deployment with anthropic 0.75.0+
         "timestamp": datetime.utcnow().isoformat()
     }
 
