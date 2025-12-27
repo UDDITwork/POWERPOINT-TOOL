@@ -12,7 +12,7 @@ python-multipart==0.0.6
 
 # ============ PowerPoint Generation (PRIMARY) ============
 python-pptx==1.0.0          # 182 shapes, 100% native PPTX
-Pillow==10.1.0              # Image processing for previews
+Pillow>=10.1.0,<11.0.0      # Image processing for previews (compatible with Python 3.11-3.13)
 
 # ============ AI Integration (Direct API - NO LangChain!) ============
 anthropic==0.40.0           # Claude API - pure Python
