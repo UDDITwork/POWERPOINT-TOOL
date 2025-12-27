@@ -438,8 +438,19 @@ OUTPUT: Complete updated JSON specification
             end = text.find("```", start)
             text = text[start:end].strip()
 
+        # Clean up common JSON issues
+        # Remove trailing commas before closing braces/brackets
+        import re
+        text = re.sub(r',(\s*[}\]])', r'\1', text)
+
         # Try to parse
-        return json.loads(text)
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError as e:
+            # Log the problematic JSON for debugging
+            logger.error(f"JSON parse error at line {e.lineno} column {e.colno}: {e.msg}")
+            logger.error(f"Problematic JSON:\n{text}")
+            raise ValueError(f"Invalid JSON from Claude: {e.msg} at line {e.lineno} column {e.colno}")
 
     def analyze_prompt_complexity(self, prompt: str) -> Dict[str, Any]:
         """
