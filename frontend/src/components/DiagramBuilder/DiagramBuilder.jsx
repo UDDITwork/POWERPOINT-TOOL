@@ -11,6 +11,7 @@ import ReactFlow, {
 import 'reactflow/dist/style.css';
 
 import ShapeNode from '../nodes/ShapeNode';
+import GroupNode from '../nodes/GroupNode';
 import Sidebar from './Sidebar';
 import Toolbar from './Toolbar';
 import AIPromptPanel from './AIPromptPanel';
@@ -23,6 +24,7 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 const nodeTypes = {
   shape: ShapeNode,
+  group: GroupNode,
 };
 
 const defaultEdgeOptions = {
@@ -408,8 +410,8 @@ const DiagramBuilder = () => {
       // Call backend v3 endpoint (Opus with extended thinking)
       const response = await axios.post(`${API_URL}/api/diagram/create-v3`, {
         prompt: prompt,
-        thinking_budget: 16000,
-        validate: true,
+        thinking_budget: 5000,  // Lower budget for faster generation
+        validate: false,  // Skip self-validation for speed
       });
 
       const jobId = response.data.job_id;
@@ -533,12 +535,13 @@ const DiagramBuilder = () => {
   }, [nodes.length, sessionId, handleAIGenerate]);
 
   // Convert AI spec (V1 format from backend) to React Flow nodes
-  // V1 format has elements array with both shapes and connectors
+  // V1 format has elements array with both shapes, containers, and connectors
   // Positions are in INCHES, need to convert to PIXELS
   const convertSpecToNodes = useCallback((spec) => {
     const newNodes = [];
     const newEdges = [];
     const shapeIds = new Set();
+    const containerIds = new Set();
 
     // Map backend shape types to frontend shape types
     const shapeTypeMap = {
@@ -569,21 +572,72 @@ const DiagramBuilder = () => {
       return color.startsWith('#') ? color : `#${color}`;
     };
 
-    // First pass: collect all shape IDs and create nodes
+    // First pass: Create container/group nodes (they need to be added first)
     if (spec.elements) {
-      spec.elements.forEach((element, index) => {
-        // Skip connectors in first pass
+      spec.elements.forEach((element) => {
+        // Check if this is a container (has is_container flag or children array)
+        if (!element.is_container) return;
         if (element.type === 'connector') return;
+
+        const id = element.id || uuidv4();
+        containerIds.add(id);
+        shapeIds.add(id);
+
+        // Convert position from inches to pixels
+        const posX = element.position?.x || 1;
+        const posY = element.position?.y || 1;
+        const x = posX * PIXELS_PER_INCH;
+        const y = posY * PIXELS_PER_INCH;
+
+        // Convert size from inches to pixels
+        const widthInches = element.size?.width || 3.5;
+        const heightInches = element.size?.height || 2.5;
+        const width = widthInches * PIXELS_PER_INCH;
+        const height = heightInches * PIXELS_PER_INCH;
+
+        // Get colors from style
+        const style = element.style || {};
+        const borderColor = normalizeColor(style.line_color || '666666');
+
+        const node = {
+          id,
+          type: 'group',  // Use group node type
+          position: { x, y },
+          data: {
+            label: element.text || 'Group',
+            borderColor,
+            borderWidth: style.line_width || 2,
+            textColor: '#333333',
+            fontSize: 11,
+            backgroundColor: 'rgba(240, 240, 240, 0.3)',
+            onLabelChange: handleLabelChange,
+          },
+          style: {
+            width,
+            height,
+            zIndex: -1,  // Containers should be behind children
+          },
+        };
+
+        newNodes.push(node);
+      });
+    }
+
+    // Second pass: Create regular shape nodes (non-containers)
+    if (spec.elements) {
+      spec.elements.forEach((element) => {
+        // Skip connectors and containers
+        if (element.type === 'connector') return;
+        if (element.is_container) return;
 
         const id = element.id || uuidv4();
         shapeIds.add(id);
 
         // Convert position from inches to pixels
-        // Backend sends inches, frontend uses pixels (96 DPI)
         const posX = element.position?.x || 1;
         const posY = element.position?.y || 1;
-        const x = posX * PIXELS_PER_INCH;
-        const y = posY * PIXELS_PER_INCH;
+        let x = posX * PIXELS_PER_INCH;
+        let y = posY * PIXELS_PER_INCH;
 
         // Convert size from inches to pixels
         const widthInches = element.size?.width || 2.5;
@@ -617,11 +671,27 @@ const DiagramBuilder = () => {
           style: { width, height },
         };
 
+        // If this node has a parent container, set up the parent relationship
+        // NOTE: React Flow's parentNode feature positions children relative to parent
+        if (element.parent_id && containerIds.has(element.parent_id)) {
+          // Find the parent container node to get its position
+          const parentNode = newNodes.find(n => n.id === element.parent_id);
+          if (parentNode) {
+            node.parentNode = element.parent_id;
+            node.extent = 'parent';  // Constrain child to parent bounds
+            // Convert to relative position within parent
+            node.position = {
+              x: x - parentNode.position.x,
+              y: y - parentNode.position.y,
+            };
+          }
+        }
+
         newNodes.push(node);
       });
     }
 
-    // Second pass: create edges from connectors
+    // Third pass: create edges from connectors
     if (spec.elements) {
       spec.elements.forEach((element) => {
         if (element.type !== 'connector') return;
@@ -666,7 +736,7 @@ const DiagramBuilder = () => {
       });
     }
 
-    console.log(`Converted spec to ${newNodes.length} nodes and ${newEdges.length} edges`);
+    console.log(`Converted spec to ${newNodes.length} nodes (${containerIds.size} containers) and ${newEdges.length} edges`);
 
     setNodes(newNodes);
     setEdges(newEdges);

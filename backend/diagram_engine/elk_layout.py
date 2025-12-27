@@ -77,6 +77,8 @@ class LayoutNode:
     hint: Optional[str] = None
     size_hint: Optional[str] = None
     style: Optional[Dict] = None
+    parent: Optional[str] = None  # Parent container ID
+    is_container: bool = False    # True if this is a container/group
 
     # Layout properties (calculated)
     layer: int = 0
@@ -586,16 +588,481 @@ class ELKLayoutEngine:
         return v1_spec
 
 
+class HierarchicalGroupLayout:
+    """
+    Layout engine that supports hierarchical containers/groups.
+
+    This engine:
+    1. Processes containers and their children
+    2. Sizes containers to fit their children (bottom-up)
+    3. Positions containers and then children within them (top-down)
+    4. Creates dashed-border container shapes
+    """
+
+    # Size presets (in inches)
+    SIZE_PRESETS = {
+        'small': (1.5, 0.6),
+        'medium': (2.5, 1.0),
+        'large': (3.5, 1.5),
+        'wide': (4.0, 1.0),
+        'tall': (2.0, 2.0),
+    }
+
+    # Layout constants
+    SLIDE_WIDTH = 10.0
+    SLIDE_HEIGHT = 7.5
+    MARGIN = 0.5
+    CONTAINER_PADDING = 0.4  # Padding inside containers
+    CONTAINER_LABEL_HEIGHT = 0.5  # Space for container label
+    CONTAINER_SPACING = 0.6  # Space between sibling containers
+    NODE_SPACING = 0.3  # Space between nodes in same container
+
+    def __init__(self, slide_width: float = 10.0, slide_height: float = 7.5):
+        self.slide_width = slide_width
+        self.slide_height = slide_height
+        self.containers: Dict[str, Dict] = {}
+        self.nodes: Dict[str, LayoutNode] = {}
+        self.edges: List[LayoutEdge] = []
+        self.container_children: Dict[str, List[str]] = {}  # container_id -> [node_ids]
+
+    def layout(self, spec: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Main entry point: convert V2 spec with containers to V1 spec with positions.
+
+        Args:
+            spec: V2 diagram spec with containers, nodes, edges
+
+        Returns:
+            V1 diagram spec with elements array containing positioned shapes
+        """
+        logger.info(f"Starting hierarchical group layout")
+
+        # Reset state
+        self.containers = {}
+        self.nodes = {}
+        self.edges = []
+        self.container_children = {}
+
+        # Parse input
+        self._parse_spec(spec)
+
+        # Check if we have containers
+        has_containers = len(self.containers) > 0
+
+        if has_containers:
+            # Run hierarchical layout
+            self._calculate_container_sizes()
+            self._position_containers()
+            self._position_nodes_in_containers()
+            self._position_orphan_nodes()  # Nodes without parents
+        else:
+            # Fall back to flat layout (use ELK)
+            elk_engine = ELKLayoutEngine(self.slide_width, self.slide_height)
+            return elk_engine.layout(spec)
+
+        # Remove overlaps
+        self._remove_overlaps()
+
+        # Convert to V1 format
+        return self._to_v1_spec(spec.get('metadata', {}))
+
+    def _parse_spec(self, spec: Dict[str, Any]) -> None:
+        """Parse V2 spec with containers into internal structures."""
+        # Parse containers
+        for container_data in spec.get('containers', []):
+            container_id = container_data['id']
+            self.containers[container_id] = {
+                'id': container_id,
+                'label': container_data.get('label', ''),
+                'children': container_data.get('children', []),
+                'style': container_data.get('style', {'border_style': 'dashed'}),
+                'hint': container_data.get('hint'),
+                'box': BoundingBox()  # Will be calculated
+            }
+            self.container_children[container_id] = container_data.get('children', [])
+
+        # Parse nodes
+        for node_data in spec.get('nodes', []):
+            size = self._get_size(node_data.get('size_hint', 'medium'))
+            node = LayoutNode(
+                id=node_data['id'],
+                type=node_data['type'],
+                text=node_data.get('text', ''),
+                hint=node_data.get('hint'),
+                size_hint=node_data.get('size_hint'),
+                style=node_data.get('style'),
+                parent=node_data.get('parent'),  # Parent container ID
+                box=BoundingBox(width=size[0], height=size[1])
+            )
+            self.nodes[node.id] = node
+
+        # Parse edges
+        for edge_data in spec.get('edges', []):
+            edge = LayoutEdge(
+                id=edge_data['id'],
+                from_node=edge_data['from'],
+                to_node=edge_data['to'],
+                label=edge_data.get('label'),
+                style=edge_data.get('style')
+            )
+            self.edges.append(edge)
+
+        logger.debug(f"Parsed {len(self.containers)} containers, {len(self.nodes)} nodes, {len(self.edges)} edges")
+
+    def _get_size(self, size_hint: Optional[str]) -> Tuple[float, float]:
+        """Convert size hint to actual dimensions."""
+        if size_hint and size_hint.lower() in self.SIZE_PRESETS:
+            return self.SIZE_PRESETS[size_hint.lower()]
+        return self.SIZE_PRESETS['medium']
+
+    def _calculate_container_sizes(self) -> None:
+        """
+        Calculate container sizes based on their children (bottom-up sizing).
+
+        Container size = children bounding box + padding + label height
+        """
+        for container_id, container in self.containers.items():
+            children_ids = container['children']
+
+            if not children_ids:
+                # Empty container - give it minimum size
+                container['box'] = BoundingBox(
+                    width=2.0,
+                    height=1.5
+                )
+                continue
+
+            # Calculate total size needed for children
+            child_nodes = [self.nodes[cid] for cid in children_ids if cid in self.nodes]
+
+            if not child_nodes:
+                container['box'] = BoundingBox(width=2.0, height=1.5)
+                continue
+
+            # Calculate children bounding box (stacked vertically by default)
+            max_child_width = max(n.box.width for n in child_nodes)
+            total_child_height = sum(n.box.height for n in child_nodes)
+            total_child_height += self.NODE_SPACING * (len(child_nodes) - 1)
+
+            # Container size = children + padding + label
+            container_width = max_child_width + 2 * self.CONTAINER_PADDING
+            container_height = total_child_height + 2 * self.CONTAINER_PADDING + self.CONTAINER_LABEL_HEIGHT
+
+            container['box'] = BoundingBox(
+                width=container_width,
+                height=container_height
+            )
+
+        logger.debug(f"Calculated container sizes: {[(c, self.containers[c]['box'].width, self.containers[c]['box'].height) for c in self.containers]}")
+
+    def _position_containers(self) -> None:
+        """
+        Position containers based on hints (top-down positioning).
+
+        Supports hints like:
+        - "left", "right", "top", "center"
+        - "right-of:container_id"
+        """
+        positioned: Set[str] = set()
+        remaining = list(self.containers.keys())
+
+        current_x = self.MARGIN
+        current_y = self.MARGIN
+
+        # First pass: position containers with absolute hints
+        for container_id in list(remaining):
+            container = self.containers[container_id]
+            hint = container.get('hint', '').lower()
+
+            if hint in ['left', 'top-left', '']:
+                container['box'].x = current_x
+                container['box'].y = current_y
+                positioned.add(container_id)
+                remaining.remove(container_id)
+
+        # Second pass: position containers with relative hints
+        MAX_ITERATIONS = 10
+        for _ in range(MAX_ITERATIONS):
+            if not remaining:
+                break
+
+            for container_id in list(remaining):
+                container = self.containers[container_id]
+                hint = container.get('hint', '').lower()
+
+                if hint.startswith('right-of:'):
+                    ref_id = container['hint'][9:]  # Original case
+                    if ref_id in positioned:
+                        ref_container = self.containers[ref_id]
+                        container['box'].x = ref_container['box'].right + self.CONTAINER_SPACING
+                        container['box'].y = ref_container['box'].y
+                        positioned.add(container_id)
+                        remaining.remove(container_id)
+
+                elif hint.startswith('below:'):
+                    ref_id = container['hint'][6:]
+                    if ref_id in positioned:
+                        ref_container = self.containers[ref_id]
+                        container['box'].x = ref_container['box'].x
+                        container['box'].y = ref_container['box'].bottom + self.CONTAINER_SPACING
+                        positioned.add(container_id)
+                        remaining.remove(container_id)
+
+                elif hint == 'right':
+                    # Position at right side
+                    max_x = self.MARGIN
+                    for pid in positioned:
+                        max_x = max(max_x, self.containers[pid]['box'].right)
+                    container['box'].x = max_x + self.CONTAINER_SPACING
+                    container['box'].y = self.MARGIN
+                    positioned.add(container_id)
+                    remaining.remove(container_id)
+
+        # Position any remaining containers in a row
+        next_x = self.MARGIN
+        for pid in positioned:
+            next_x = max(next_x, self.containers[pid]['box'].right + self.CONTAINER_SPACING)
+
+        for container_id in remaining:
+            container = self.containers[container_id]
+            container['box'].x = next_x
+            container['box'].y = self.MARGIN
+            next_x = container['box'].right + self.CONTAINER_SPACING
+            positioned.add(container_id)
+
+        logger.debug(f"Positioned {len(positioned)} containers")
+
+    def _position_nodes_in_containers(self) -> None:
+        """
+        Position nodes inside their parent containers.
+
+        Nodes are stacked vertically inside their container.
+        """
+        for container_id, container in self.containers.items():
+            children_ids = container['children']
+            child_nodes = [self.nodes[cid] for cid in children_ids if cid in self.nodes]
+
+            if not child_nodes:
+                continue
+
+            # Start position inside container (after label)
+            start_x = container['box'].x + self.CONTAINER_PADDING
+            start_y = container['box'].y + self.CONTAINER_LABEL_HEIGHT + self.CONTAINER_PADDING
+
+            # Center children horizontally in container
+            container_inner_width = container['box'].width - 2 * self.CONTAINER_PADDING
+
+            current_y = start_y
+            for node in child_nodes:
+                # Center node horizontally
+                node.box.x = start_x + (container_inner_width - node.box.width) / 2
+                node.box.y = current_y
+                current_y += node.box.height + self.NODE_SPACING
+
+        logger.debug("Positioned nodes in containers")
+
+    def _position_orphan_nodes(self) -> None:
+        """Position nodes that don't belong to any container."""
+        orphan_nodes = [n for n in self.nodes.values() if n.parent is None]
+
+        if not orphan_nodes:
+            return
+
+        # Find rightmost container
+        max_x = self.MARGIN
+        for container in self.containers.values():
+            max_x = max(max_x, container['box'].right)
+
+        # Position orphan nodes to the right of containers
+        start_x = max_x + self.CONTAINER_SPACING if self.containers else self.MARGIN
+        current_y = self.MARGIN
+
+        for node in orphan_nodes:
+            node.box.x = start_x
+            node.box.y = current_y
+            current_y += node.box.height + self.NODE_SPACING
+
+    def _remove_overlaps(self) -> None:
+        """Remove any overlapping elements."""
+        MAX_ITERATIONS = 30
+        SEPARATION_STEP = 0.15
+
+        all_boxes = []
+        for container in self.containers.values():
+            all_boxes.append(('container', container['id'], container['box']))
+
+        for iteration in range(MAX_ITERATIONS):
+            overlaps_found = False
+
+            for i, (type1, id1, box1) in enumerate(all_boxes):
+                for j, (type2, id2, box2) in enumerate(all_boxes[i + 1:], i + 1):
+                    if box1.overlaps(box2):
+                        overlaps_found = True
+
+                        # Calculate separation
+                        dx = box2.center_x - box1.center_x
+                        dy = box2.center_y - box1.center_y
+                        distance = math.sqrt(dx * dx + dy * dy) or 0.01
+
+                        dx = (dx / distance) * SEPARATION_STEP
+                        dy = (dy / distance) * SEPARATION_STEP
+
+                        box1.x -= dx / 2
+                        box1.y -= dy / 2
+                        box2.x += dx / 2
+                        box2.y += dy / 2
+
+            if not overlaps_found:
+                break
+
+        # Reposition nodes in containers after container movement
+        self._position_nodes_in_containers()
+
+        # Clamp to slide bounds
+        for container in self.containers.values():
+            box = container['box']
+            box.x = max(self.MARGIN, min(self.slide_width - self.MARGIN - box.width, box.x))
+            box.y = max(self.MARGIN, min(self.slide_height - self.MARGIN - box.height, box.y))
+
+        for node in self.nodes.values():
+            box = node.box
+            box.x = max(self.MARGIN, min(self.slide_width - self.MARGIN - box.width, box.x))
+            box.y = max(self.MARGIN, min(self.slide_height - self.MARGIN - box.height, box.y))
+
+    def _to_v1_spec(self, metadata: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Convert to V1 format with positioned elements.
+
+        Containers become rectangles with dashed borders.
+        """
+        elements = []
+
+        # Add containers first (so they render behind children)
+        for container_id, container in self.containers.items():
+            box = container['box']
+            style = container.get('style', {})
+
+            element = {
+                'id': container_id,
+                'type': 'rectangle',  # Containers are rectangles
+                'text': container['label'],
+                'position': {
+                    'x': round(box.x, 2),
+                    'y': round(box.y, 2)
+                },
+                'size': {
+                    'width': round(box.width, 2),
+                    'height': round(box.height, 2)
+                },
+                'style': {
+                    'line_color': '666666',  # Gray dashed border
+                    'line_width': 1.5,
+                    'line_style': style.get('border_style', 'dashed'),
+                    # No fill - transparent background
+                },
+                'is_container': True,  # Mark as container for PPTX grouping
+                'children': container['children'],
+                'text_format': {
+                    'color': '333333',
+                    'align': 'left',
+                    'vertical_align': 'top'  # Label at top of container
+                }
+            }
+            elements.append(element)
+
+        # Add nodes
+        for node_id, node in self.nodes.items():
+            element = {
+                'id': node.id,
+                'type': node.type,
+                'text': node.text,
+                'position': {
+                    'x': round(node.box.x, 2),
+                    'y': round(node.box.y, 2)
+                },
+                'size': {
+                    'width': round(node.box.width, 2),
+                    'height': round(node.box.height, 2)
+                },
+                'style': {
+                    'line_color': '000000',
+                    'line_width': 1.0,
+                },
+                'text_format': {
+                    'color': '000000',
+                    'align': 'center',
+                    'vertical_align': 'middle'
+                }
+            }
+
+            # Add parent reference for grouping
+            if node.parent:
+                element['parent_id'] = node.parent
+
+            elements.append(element)
+
+        # Add connectors (edges)
+        for edge in self.edges:
+            # Check if edge connects containers or nodes
+            from_exists = edge.from_node in self.nodes or edge.from_node in self.containers
+            to_exists = edge.to_node in self.nodes or edge.to_node in self.containers
+
+            if not from_exists or not to_exists:
+                logger.warning(f"Edge {edge.id} references unknown node(s)")
+                continue
+
+            connector = {
+                'id': edge.id,
+                'type': 'connector',
+                'connector_type': 'straight',
+                'from': edge.from_node,
+                'to': edge.to_node,
+                'style': {
+                    'arrow_end': True,
+                    'line_width': 1.0,
+                    'line_color': '000000'
+                }
+            }
+
+            if edge.label:
+                connector['label'] = edge.label
+
+            elements.append(connector)
+
+        v1_spec = {
+            'metadata': {
+                'title': metadata.get('title', 'Generated Diagram'),
+                'diagram_type': metadata.get('diagram_type', 'hierarchical')
+            },
+            'elements': elements,
+            'layout': {
+                'type': 'hierarchical_group',
+                'direction': metadata.get('direction', 'DOWN')
+            }
+        }
+
+        logger.info(f"Generated V1 spec with {len(elements)} elements ({len(self.containers)} containers, {len(self.nodes)} nodes)")
+        return v1_spec
+
+
 # Convenience function
 def apply_elk_layout(v2_spec: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Apply ELK layout to a V2 diagram spec.
+    Apply layout to a V2 diagram spec.
+
+    Uses HierarchicalGroupLayout if containers are present,
+    otherwise falls back to ELKLayoutEngine.
 
     Args:
-        v2_spec: Diagram spec with nodes and edges (no positions)
+        v2_spec: Diagram spec with nodes, edges, and optional containers
 
     Returns:
         V1 diagram spec with calculated positions
     """
-    engine = ELKLayoutEngine()
-    return engine.layout(v2_spec)
+    # Check if spec has containers
+    if v2_spec.get('containers'):
+        engine = HierarchicalGroupLayout()
+        return engine.layout(v2_spec)
+    else:
+        engine = ELKLayoutEngine()
+        return engine.layout(v2_spec)

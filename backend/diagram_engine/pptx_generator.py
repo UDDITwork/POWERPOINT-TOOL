@@ -592,8 +592,14 @@ class PPTXDiagramGenerator:
         - Transparent fill (no fill)
         - Black border (1pt)
         - Solid line style
+
+        For containers:
+        - Dashed border
+        - Gray color
+        - Transparent fill
         """
         style = element.get('style', {})
+        is_container = element.get('is_container', False)
 
         # Fill color - default to NO FILL (transparent) for patent diagrams
         if 'fill_color' in style and style['fill_color']:
@@ -606,24 +612,32 @@ class PPTXDiagramGenerator:
             # No fill = transparent background
             shape.fill.background()
 
-        # Line color - default to BLACK
-        line_color = style.get('line_color', '000000')
+        # Line color - default to BLACK (gray for containers)
+        if is_container:
+            line_color = style.get('line_color', '666666')  # Gray for containers
+        else:
+            line_color = style.get('line_color', '000000')
         rgb = self._hex_to_rgb(line_color)
         shape.line.color.rgb = RGBColor(*rgb)
 
-        # Line width - default to 1pt
-        line_width = style.get('line_width', 1.0)
+        # Line width - default to 1pt (1.5pt for containers)
+        if is_container:
+            line_width = style.get('line_width', 1.5)
+        else:
+            line_width = style.get('line_width', 1.0)
         shape.line.width = Pt(line_width)
 
-        # Line style (dashed, dotted, etc.) - default to solid
-        if 'line_style' in style:
-            line_style_map = {
-                'solid': MSO_LINE_DASH_STYLE.SOLID,
-                'dash': MSO_LINE_DASH_STYLE.DASH,
-                'dot': MSO_LINE_DASH_STYLE.DOT,
-                'dash_dot': MSO_LINE_DASH_STYLE.DASH_DOT,
-            }
-            shape.line.dash_style = line_style_map.get(style['line_style'], MSO_LINE_DASH_STYLE.SOLID)
+        # Line style (dashed, dotted, etc.) - default to solid (dashed for containers)
+        line_style = style.get('line_style', 'dashed' if is_container else 'solid')
+        line_style_map = {
+            'solid': MSO_LINE_DASH_STYLE.SOLID,
+            'dash': MSO_LINE_DASH_STYLE.DASH,
+            'dashed': MSO_LINE_DASH_STYLE.DASH,  # Alias
+            'dot': MSO_LINE_DASH_STYLE.DOT,
+            'dotted': MSO_LINE_DASH_STYLE.DOT,   # Alias
+            'dash_dot': MSO_LINE_DASH_STYLE.DASH_DOT,
+        }
+        shape.line.dash_style = line_style_map.get(line_style, MSO_LINE_DASH_STYLE.SOLID)
 
         # Rotation
         if 'rotation' in style:
@@ -671,6 +685,10 @@ class PPTXDiagramGenerator:
         For patent diagrams, default is:
         - Black text color
         - Center aligned
+
+        For containers:
+        - Top-left aligned label
+        - Slightly smaller font
         """
         text = element.get('text', '')
         text_frame = shape.text_frame
@@ -681,41 +699,53 @@ class PPTXDiagramGenerator:
 
         # Text formatting
         text_config = element.get('text_format', {})
+        is_container = element.get('is_container', False)
 
+        # Font size - smaller for containers
         if 'font_size' in text_config:
             paragraph.font.size = Pt(text_config['font_size'])
+        elif is_container:
+            paragraph.font.size = Pt(10)  # Smaller font for container labels
 
         if 'font_name' in text_config:
             paragraph.font.name = text_config['font_name']
 
+        # Bold for containers
         if 'bold' in text_config:
             paragraph.font.bold = text_config['bold']
+        elif is_container:
+            paragraph.font.bold = True  # Container labels are bold
 
         if 'italic' in text_config:
             paragraph.font.italic = text_config['italic']
 
-        # Text color - default to BLACK
-        text_color = text_config.get('color', '000000')
+        # Text color - default to BLACK (dark gray for containers)
+        if is_container:
+            text_color = text_config.get('color', '333333')
+        else:
+            text_color = text_config.get('color', '000000')
         rgb = self._hex_to_rgb(text_color)
         paragraph.font.color.rgb = RGBColor(*rgb)
 
-        # Text alignment - default to CENTER
+        # Text alignment - left for containers, center for nodes
         align_map = {
             'left': PP_ALIGN.LEFT,
             'center': PP_ALIGN.CENTER,
             'right': PP_ALIGN.RIGHT,
             'justify': PP_ALIGN.JUSTIFY,
         }
-        text_align = text_config.get('align', 'center')
+        default_align = 'left' if is_container else 'center'
+        text_align = text_config.get('align', default_align)
         paragraph.alignment = align_map.get(text_align, PP_ALIGN.CENTER)
 
-        # Vertical alignment - default to MIDDLE
+        # Vertical alignment - top for containers, middle for nodes
         valign_map = {
             'top': MSO_ANCHOR.TOP,
             'middle': MSO_ANCHOR.MIDDLE,
             'bottom': MSO_ANCHOR.BOTTOM,
         }
-        vertical_align = text_config.get('vertical_align', 'middle')
+        default_valign = 'top' if is_container else 'middle'
+        vertical_align = text_config.get('vertical_align', default_valign)
         text_frame.vertical_anchor = valign_map.get(vertical_align, MSO_ANCHOR.MIDDLE)
 
     def _apply_text_formatting(self, text_frame, element: Dict[str, Any]) -> None:

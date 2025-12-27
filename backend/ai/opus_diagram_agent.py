@@ -28,6 +28,7 @@ class NodeStyle(BaseModel):
     fill_color: Optional[str] = Field(None, description="Fill color as hex (e.g., 'FFFFFF', '4472C4')")
     line_color: Optional[str] = Field(None, description="Border color as hex")
     line_width: Optional[float] = Field(None, description="Border width in points")
+    border_style: Optional[str] = Field(None, description="Border style: 'solid', 'dashed', 'dotted'")
 
 
 class DiagramNode(BaseModel):
@@ -38,6 +39,17 @@ class DiagramNode(BaseModel):
     hint: Optional[str] = Field(None, description="Position hint: 'top', 'left', 'center', 'below:nodeId', 'right-of:nodeId', 'same-row:nodeId'")
     size_hint: Optional[str] = Field(None, description="Size hint: 'small', 'medium', 'large', 'wide', 'tall'")
     style: Optional[NodeStyle] = Field(None, description="Visual style")
+    parent: Optional[str] = Field(None, description="Parent container ID for nested elements")
+    children: Optional[List[str]] = Field(None, description="Child node IDs for inline nesting")
+
+
+class DiagramContainer(BaseModel):
+    """A container/group that holds related nodes together."""
+    id: str = Field(..., description="Unique container ID (e.g., 'group_100', 'container_A')")
+    label: str = Field(..., description="Container label text")
+    children: List[str] = Field(..., description="List of child node IDs contained in this group")
+    style: Optional[NodeStyle] = Field(None, description="Visual style - typically dashed border")
+    hint: Optional[str] = Field(None, description="Position hint for the container")
 
 
 class DiagramEdge(BaseModel):
@@ -55,13 +67,14 @@ class DiagramEdge(BaseModel):
 class DiagramMetadataV2(BaseModel):
     """Metadata about the diagram."""
     title: Optional[str] = Field(None, description="Diagram title")
-    diagram_type: str = Field(..., description="Type: flowchart, block_diagram, network, hierarchy")
+    diagram_type: str = Field(..., description="Type: flowchart, block_diagram, network, hierarchical")
     direction: Optional[str] = Field("DOWN", description="Flow direction: DOWN, RIGHT, UP, LEFT")
 
 
 class DiagramSpecV2(BaseModel):
-    """V2 diagram spec: nodes + edges (no positions - layout engine handles that)."""
+    """V2 diagram spec with hierarchical container support."""
     metadata: DiagramMetadataV2
+    containers: Optional[List[DiagramContainer]] = Field(default_factory=list, description="List of container groups with dashed borders")
     nodes: List[DiagramNode] = Field(..., min_length=1, description="List of nodes/shapes")
     edges: List[DiagramEdge] = Field(default_factory=list, description="List of connections")
 
@@ -85,7 +98,7 @@ class OpusDiagramAgent:
     # Multi-stage reasoning system prompt for Opus with extended thinking
     SYSTEM_PROMPT_OPUS = """You are an expert patent diagram architect using multi-step reasoning.
 
-Your task is to convert natural language descriptions into a LOGICAL STRUCTURE with nodes and edges.
+Your task is to convert natural language descriptions into a HIERARCHICAL STRUCTURE with containers, nodes, and edges.
 You do NOT generate x,y coordinates. A layout engine will calculate positions automatically.
 
 CRITICAL: Before generating output, you MUST think through these stages in your extended thinking:
@@ -96,44 +109,58 @@ Analyze the user's request:
 - How many distinct elements/nodes are needed?
 - What are the relationships between elements?
 - What is the visual hierarchy and flow direction?
-- Are there any special requirements (colors, groupings, branches)?
+- Are there LOGICAL GROUPINGS? (elements that belong together conceptually)
 
-## STAGE 2: PLAN LAYOUT
+## STAGE 2: IDENTIFY CONTAINERS/GROUPS
+Determine which elements should be grouped together:
+- Look for subsystems, modules, or related components
+- Identify parent-child relationships
+- Find elements that share a common purpose or location
+- Create CONTAINERS with DASHED BORDERS to visually group related items
+
+## STAGE 3: PLAN LAYOUT
 Design the spatial arrangement:
-- Which elements should be on the same level/row?
+- Which containers should be side-by-side vs stacked?
+- Which elements belong INSIDE which container?
 - What is the primary flow direction (top-to-bottom, left-to-right)?
-- Where should decision branches diverge and reconverge?
 - How to prevent connector crossings?
-- Which elements need to be visually grouped together?
 
-## STAGE 3: VALIDATE BEFORE OUTPUT
+## STAGE 4: VALIDATE BEFORE OUTPUT
 Check your planned structure:
-- Will any boxes overlap based on the position hints?
+- Does every child node reference its parent container?
+- Are containers properly sized to fit their children?
 - Do all connectors have clear, logical paths?
 - Is the layout balanced and readable?
-- Are there any missing connections from the user's requirements?
-- Does the flow make logical sense?
 
 If you find ANY issues in validation, REVISE your plan before generating output.
 
-## STAGE 4: GENERATE OUTPUT
+## STAGE 5: GENERATE OUTPUT
 Only after thorough planning and validation, output the JSON specification.
 
-OUTPUT FORMAT:
+OUTPUT FORMAT WITH HIERARCHICAL CONTAINERS:
 {
   "metadata": {
     "title": "Diagram Title",
-    "diagram_type": "flowchart|block_diagram|network|hierarchy",
+    "diagram_type": "hierarchical|flowchart|block_diagram|network",
     "direction": "DOWN|RIGHT|UP|LEFT"
   },
+  "containers": [
+    {
+      "id": "container_100",
+      "label": "Container Name (100)",
+      "children": ["node_110", "node_120", "node_130"],
+      "style": {"border_style": "dashed"},
+      "hint": "left"
+    }
+  ],
   "nodes": [
     {
-      "id": "unique_id",
-      "type": "shape_type",
-      "text": "Label Text",
-      "hint": "position_hint",
-      "size_hint": "size_hint",
-      "style": {"fill_color": "FFFFFF", "line_color": "000000"}
+      "id": "node_110",
+      "type": "rectangle",
+      "text": "Node Label\\n(110)",
+      "parent": "container_100",
+      "hint": "top",
+      "size_hint": "medium"
     }
   ],
   "edges": [
@@ -146,14 +173,22 @@ OUTPUT FORMAT:
   ]
 }
 
+CONTAINER RULES (CRITICAL FOR PATENT DIAGRAMS):
+1. Use containers to GROUP related elements visually
+2. Containers have DASHED BORDERS by default (style: {"border_style": "dashed"})
+3. Every node inside a container MUST have "parent": "container_id"
+4. Container's "children" array lists all node IDs inside it
+5. Containers can be side-by-side using hints like "right-of:other_container"
+6. Containers automatically size to fit their children
+
 AVAILABLE SHAPE TYPES:
 Basic: rectangle, rounded_rectangle, oval, diamond, hexagon, triangle, parallelogram
 Flowchart: process, decision, terminator, data, document, predefined_process
 Arrows: left_arrow, right_arrow, up_arrow, down_arrow
 Special: star, cloud, cylinder, database, gear
 
-POSITION HINTS (the layout engine uses these as guidance):
-- Absolute: "top", "bottom", "left", "right", "center", "top-left", "top-right", "bottom-left", "bottom-right"
+POSITION HINTS:
+- Absolute: "top", "bottom", "left", "right", "center"
 - Relative: "below:nodeId", "above:nodeId", "right-of:nodeId", "left-of:nodeId"
 - Alignment: "same-row:nodeId", "same-column:nodeId"
 
@@ -166,67 +201,103 @@ SIZE HINTS:
 
 PATENT CONVENTIONS:
 - Reference numbers: (100), (110), (120), (200), (210), etc.
-- Main components: 100-series
-- Sub-components: 110, 120, 130, etc.
-- Alternative systems: 200-series, 300-series
+- Main components/containers: 100-series, 200-series
+- Sub-components inside containers: 110, 120, 130, etc.
 - Format text as "Component Name\\n(Reference Number)"
-
-LAYOUT BEST PRACTICES:
-1. For flowcharts with decisions: Place "Yes" branch below, "No" branch to the right
-2. For parallel processes: Use "same-row" hints to align them horizontally
-3. For hierarchies: Use consistent depth levels with "below" hints
-4. For networks: Place central node in "center", satellites around it
-5. Always leave room for connector labels
 
 EXAMPLES:
 
-Example 1 - Decision Flowchart (no overlaps):
-User: "Flowchart: start -> check condition -> if yes do process A -> end; if no do process B -> end"
+Example 1 - Hierarchical System with Containers:
+User: "System 400 with Offline Setup 416A containing Input Block 402A with Traces 404A and Edges 406A, and Runtime Setup 416B containing Input Block 402B"
 {
-  "metadata": {"title": "Decision Flow", "diagram_type": "flowchart", "direction": "DOWN"},
+  "metadata": {"title": "System Architecture 400", "diagram_type": "hierarchical", "direction": "RIGHT"},
+  "containers": [
+    {
+      "id": "container_416A",
+      "label": "Offline Warmup Setup\\n(416A)",
+      "children": ["402A", "404A", "406A"],
+      "style": {"border_style": "dashed"},
+      "hint": "left"
+    },
+    {
+      "id": "container_416B",
+      "label": "Runtime Setup\\n(416B)",
+      "children": ["402B", "214A"],
+      "style": {"border_style": "dashed"},
+      "hint": "right-of:container_416A"
+    }
+  ],
   "nodes": [
-    {"id": "start", "type": "terminator", "text": "Start\\n(100)", "hint": "top", "style": {"fill_color": "90EE90"}},
-    {"id": "check", "type": "decision", "text": "Condition?\\n(110)", "hint": "below:start", "style": {"fill_color": "FFFACD"}},
-    {"id": "process_a", "type": "process", "text": "Process A\\n(120)", "hint": "below:check", "style": {"fill_color": "ADD8E6"}},
-    {"id": "process_b", "type": "process", "text": "Process B\\n(130)", "hint": "right-of:check", "style": {"fill_color": "FFB6C1"}},
-    {"id": "end", "type": "terminator", "text": "End\\n(200)", "hint": "below:process_a", "style": {"fill_color": "90EE90"}}
+    {"id": "402A", "type": "rectangle", "text": "Input Block\\n(402A)", "parent": "container_416A", "hint": "top"},
+    {"id": "404A", "type": "rectangle", "text": "Traces\\n(404A)", "parent": "container_416A", "hint": "below:402A"},
+    {"id": "406A", "type": "rectangle", "text": "Edges\\n(406A)", "parent": "container_416A", "hint": "below:404A"},
+    {"id": "402B", "type": "rectangle", "text": "Input Block\\n(402B)", "parent": "container_416B", "hint": "top"},
+    {"id": "214A", "type": "rectangle", "text": "Model\\n(214A)", "parent": "container_416B", "hint": "below:402B"}
   ],
   "edges": [
-    {"id": "e1", "from": "start", "to": "check"},
-    {"id": "e2", "from": "check", "to": "process_a", "label": "Yes"},
-    {"id": "e3", "from": "check", "to": "process_b", "label": "No"},
-    {"id": "e4", "from": "process_a", "to": "end"},
-    {"id": "e5", "from": "process_b", "to": "end"}
+    {"id": "e1", "from": "402A", "to": "404A"},
+    {"id": "e2", "from": "404A", "to": "406A"},
+    {"id": "e3", "from": "container_416A", "to": "container_416B", "label": "Data Flow"}
   ]
 }
 
-Example 2 - Block Diagram with Clear Layout:
-User: "Server connected to database and three clients"
+Example 2 - Nested Hierarchy:
+User: "Main System with Module A containing Sub-A1 and Sub-A2, and Module B containing Sub-B1"
 {
-  "metadata": {"title": "System Architecture", "diagram_type": "block_diagram", "direction": "RIGHT"},
+  "metadata": {"title": "Nested System", "diagram_type": "hierarchical", "direction": "DOWN"},
+  "containers": [
+    {
+      "id": "module_a",
+      "label": "Module A\\n(100)",
+      "children": ["sub_a1", "sub_a2"],
+      "style": {"border_style": "dashed"},
+      "hint": "left"
+    },
+    {
+      "id": "module_b",
+      "label": "Module B\\n(200)",
+      "children": ["sub_b1"],
+      "style": {"border_style": "dashed"},
+      "hint": "right-of:module_a"
+    }
+  ],
   "nodes": [
-    {"id": "client1", "type": "rounded_rectangle", "text": "Client 1\\n(200)", "hint": "left", "style": {"fill_color": "FFC000"}},
-    {"id": "client2", "type": "rounded_rectangle", "text": "Client 2\\n(210)", "hint": "below:client1", "style": {"fill_color": "FFC000"}},
-    {"id": "client3", "type": "rounded_rectangle", "text": "Client 3\\n(220)", "hint": "below:client2", "style": {"fill_color": "FFC000"}},
-    {"id": "server", "type": "rectangle", "text": "Server\\n(100)", "hint": "right-of:client2", "size_hint": "large", "style": {"fill_color": "4472C4"}},
-    {"id": "database", "type": "cylinder", "text": "Database\\n(110)", "hint": "right-of:server", "style": {"fill_color": "70AD47"}}
+    {"id": "sub_a1", "type": "rectangle", "text": "Sub-A1\\n(110)", "parent": "module_a", "hint": "top"},
+    {"id": "sub_a2", "type": "rectangle", "text": "Sub-A2\\n(120)", "parent": "module_a", "hint": "below:sub_a1"},
+    {"id": "sub_b1", "type": "rectangle", "text": "Sub-B1\\n(210)", "parent": "module_b", "hint": "top"}
   ],
   "edges": [
-    {"id": "e1", "from": "client1", "to": "server"},
-    {"id": "e2", "from": "client2", "to": "server"},
-    {"id": "e3", "from": "client3", "to": "server"},
-    {"id": "e4", "from": "server", "to": "database"}
+    {"id": "e1", "from": "sub_a1", "to": "sub_a2"},
+    {"id": "e2", "from": "sub_a2", "to": "sub_b1"}
+  ]
+}
+
+Example 3 - Simple Flowchart (no containers needed):
+User: "Flowchart: start -> process -> end"
+{
+  "metadata": {"title": "Simple Flow", "diagram_type": "flowchart", "direction": "DOWN"},
+  "containers": [],
+  "nodes": [
+    {"id": "start", "type": "terminator", "text": "Start\\n(100)", "hint": "top"},
+    {"id": "process", "type": "process", "text": "Process\\n(110)", "hint": "below:start"},
+    {"id": "end", "type": "terminator", "text": "End\\n(200)", "hint": "below:process"}
+  ],
+  "edges": [
+    {"id": "e1", "from": "start", "to": "process"},
+    {"id": "e2", "from": "process", "to": "end"}
   ]
 }
 
 CRITICAL RULES:
 1. Output ONLY valid JSON - no markdown, no explanations
-2. Include at least 2 nodes
-3. Every edge must reference valid node IDs
-4. Use position hints to describe RELATIONSHIPS, preventing overlaps
-5. For patent diagrams, always include reference numbers
-6. Think through the layout in your extended thinking before outputting
-7. Validate that no two nodes would overlap given their hints
+2. ALWAYS include "containers" array (can be empty [])
+3. For any diagram with GROUPS or SUBSYSTEMS, use containers with dashed borders
+4. Every node inside a container MUST have "parent" field matching container ID
+5. Container's "children" array MUST list all its child node IDs
+6. Every edge must reference valid node IDs
+7. Use position hints to describe RELATIONSHIPS, preventing overlaps
+8. For patent diagrams, always include reference numbers in parentheses
+9. Think through the HIERARCHY in your extended thinking before outputting
 """
 
     VALIDATION_PROMPT_TEMPLATE = """You generated this diagram specification:
