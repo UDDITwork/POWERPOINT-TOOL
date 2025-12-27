@@ -10,6 +10,7 @@ function App() {
   const [status, setStatus] = useState(null)
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [logs, setLogs] = useState([])  // Store all processing logs
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -19,6 +20,7 @@ function App() {
     setError(null)
     setStatus(null)
     setJobId(null)
+    setLogs([])  // Clear previous logs
 
     try {
       const response = await axios.post(`${API_URL}/api/diagram/create`, {
@@ -40,18 +42,33 @@ function App() {
         const response = await axios.get(`${API_URL}/api/diagram/status/${id}`)
         setStatus(response.data)
 
+        // Add status to logs
+        const timestamp = new Date().toLocaleTimeString()
+        const logEntry = `[${timestamp}] ${response.data.message || 'Processing...'} (${response.data.progress || 0}%)`
+        setLogs(prevLogs => {
+          // Avoid duplicate logs
+          if (prevLogs[prevLogs.length - 1] !== logEntry) {
+            return [...prevLogs, logEntry]
+          }
+          return prevLogs
+        })
+
         if (response.data.status === 'completed') {
           clearInterval(interval)
           setLoading(false)
+          setLogs(prevLogs => [...prevLogs, `[${timestamp}] ✅ Diagram ready for download!`])
         } else if (response.data.status === 'failed') {
           clearInterval(interval)
           setError(response.data.error || 'Diagram generation failed')
           setLoading(false)
+          setLogs(prevLogs => [...prevLogs, `[${timestamp}] ❌ Error: ${response.data.error}`])
         }
       } catch (err) {
         clearInterval(interval)
         setError('Failed to check status')
         setLoading(false)
+        const timestamp = new Date().toLocaleTimeString()
+        setLogs(prevLogs => [...prevLogs, `[${timestamp}] ❌ Network error: ${err.message}`])
       }
     }, 2000)
   }
@@ -102,6 +119,27 @@ function App() {
                 {status.error}
               </div>
             )}
+          </div>
+        )}
+
+        {logs.length > 0 && (
+          <div className="logs-card" style={{
+            marginTop: '20px',
+            padding: '15px',
+            backgroundColor: '#1a1a1a',
+            border: '1px solid #333',
+            borderRadius: '8px',
+            maxHeight: '300px',
+            overflowY: 'auto'
+          }}>
+            <h4 style={{marginTop: 0, color: '#9ca3af', fontSize: '14px'}}>Processing Logs:</h4>
+            <div style={{fontFamily: 'monospace', fontSize: '12px', color: '#e5e7eb'}}>
+              {logs.map((log, index) => (
+                <div key={index} style={{padding: '4px 0', borderBottom: '1px solid #2a2a2a'}}>
+                  {log}
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
