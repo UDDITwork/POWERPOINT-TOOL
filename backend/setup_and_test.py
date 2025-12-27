@@ -80,7 +80,7 @@ try:
 
     # Simple test call
     response = client.messages.create(
-        model="claude-sonnet-4.5-20250929",
+        model="claude-sonnet-4-5",
         max_tokens=100,
         messages=[
             {"role": "user", "content": "Say 'API working' if you can read this."}

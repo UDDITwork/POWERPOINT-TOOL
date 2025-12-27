@@ -291,7 +291,7 @@ OUTPUT: Complete updated JSON specification
     def __init__(
         self,
         api_key: str,
-        model: str = "claude-sonnet-4.5-20250929",
+        model: str = "claude-sonnet-4-5",
         max_tokens: int = 4096,
         temperature: float = 0.7
     ):

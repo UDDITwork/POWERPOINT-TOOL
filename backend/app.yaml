@@ -1,0 +1,17 @@
+# Google Cloud Run Configuration (optional - Cloud Run can work without this)
+# This file is for App Engine; Cloud Run uses different config
+# Keep for reference, but deployment will use gcloud run deploy command
+
+runtime: python311
+
+env_variables:
+  # These will be set via Google Secret Manager instead
+  # ANTHROPIC_API_KEY: "from-secret-manager"
+  BACKEND_PORT: "8080"
+
+instance_class: F2
+
+automatic_scaling:
+  target_cpu_utilization: 0.65
+  min_instances: 0
+  max_instances: 10

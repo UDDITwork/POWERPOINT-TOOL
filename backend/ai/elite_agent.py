@@ -53,7 +53,7 @@ class EliteClaudeAgent:
     def __init__(
         self,
         api_key: str,
-        model: str = "claude-sonnet-4.5-20250929",
+        model: str = "claude-sonnet-4-5",
         max_tokens: int = 8192,  # Increased for complex diagrams
         temperature: float = 0.3  # Lower for more precision
     ):

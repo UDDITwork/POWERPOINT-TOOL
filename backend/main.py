@@ -75,7 +75,7 @@ if not ANTHROPIC_API_KEY:
 else:
     claude_agent = ClaudeDiagramAgent(
         api_key=ANTHROPIC_API_KEY,
-        model=os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4.5-20250929")
+        model=os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-5")
     )
 
 # In-memory job tracking (use Redis in production)

@@ -53,7 +53,7 @@ class PatentDiagramPipeline:
     def __init__(
         self,
         anthropic_api_key: str,
-        model: str = "claude-sonnet-4.5-20250929",
+        model: str = "claude-sonnet-4-5",
         slide_width: float = 10.0,
         slide_height: float = 7.5,
         use_multi_pass: bool = False
